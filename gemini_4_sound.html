@@ -2,7 +2,7 @@
 <html>
   <head>
     <meta charset="utf-8">
-    <title>A-Frame Swarm: Enhanced Audio System</title>
+    <title>A-Frame Swarm: Dynamic Pressure Audio</title>
     <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
     <style>
       body { margin: 0; overflow: hidden; font-family: 'Segoe UI', sans-serif; user-select: none; }
@@ -38,13 +38,8 @@
         color: rgba(255,255,255,0.9); font-size: 11px; text-transform: uppercase; font-weight: 600; 
       }
       
-      .label-row {
-        display: flex; justify-content: space-between; width: 100%;
-      }
-
-      .val-display {
-        color: #00eaff; font-family: monospace; font-size: 12px;
-      }
+      .label-row { display: flex; justify-content: space-between; width: 100%; }
+      .val-display { color: #00eaff; font-family: monospace; font-size: 12px; }
       
       input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; }
       input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 14px; width: 14px; border-radius: 50%; background: #ffffff; cursor: pointer; margin-top: -5px; box-shadow: 0 0 8px rgba(255,255,255,0.8); }
@@ -60,8 +55,8 @@
   <body>
 
     <div id="audio-debug">
-      Voices: <span id="voice-count">0</span> | 
-      Queue: <span id="queue-count">0</span>
+      Density: <span id="pressure-load">0%</span> | 
+      Force: <span id="debug-force">0.1</span>
     </div>
 
     <div id="ui-container">
@@ -73,7 +68,6 @@
       </div>
       
       <div class="slider-row">
-        <!-- Force Slider: 0.01 to 1.5 -->
         <div class="slider-container">
           <div class="label-row">
             <span>Swarm Force</span>
@@ -81,11 +75,9 @@
           </div>
           <input type="range" id="intensitySlider" min="0.01" max="1.5" step="0.01" value="0.1">
         </div>
-
-        <!-- Volume Slider -->
         <div class="slider-container">
           <div class="label-row">
-            <span>Impact Vol</span>
+            <span>Master Vol</span>
             <span id="val-vol" class="val-display">25%</span>
           </div>
           <input type="range" id="volumeSlider" min="0.0" max="1.0" step="0.05" value="0.25">
@@ -99,7 +91,6 @@
       <a-entity light="type: point; intensity: 1.2; distance: 10; decay: 2; color: #00eaff" position="0 0 0"></a-entity>
       <a-entity light="type: directional; intensity: 0.5; position: 2 4 3"></a-entity>
 
-      <!-- Safe Sphere -->
       <a-entity id="safe-sphere-container" position="0 0 0" ambient-breathing>
         <a-sphere id="safe-core" radius="1.5" segments-width="64" segments-height="64" material="color: #00a8ff; opacity: 0.12; transparent: true; roughness: 0.1; metalness: 0.0; side: double; blending: additive; depthWrite: false"></a-sphere>
         <a-sphere id="safe-wire" radius="1.51" segments-width="24" segments-height="16" material="color: #48dbfb; wireframe: true; opacity: 0.2; transparent: true; side: double; depthWrite: false"></a-sphere>
@@ -118,7 +109,7 @@
 
     <script>
       /**
-       * ENHANCED IMPACT ENGINE
+       * ADVANCED AUDIO ENGINE
        */
       class EnhancedImpactEngine {
         constructor() {
@@ -126,9 +117,7 @@
           this.ctx = new AudioContext();
           
           this.maxVoices = 8; 
-          this.activeVoices = [];
           this.voicePool = [];
-          
           this.lastTriggerTime = 0;
           this.minTimeBetweenTriggers = 15; 
           this.impactQueue = [];
@@ -137,53 +126,36 @@
           this.masterGain = this.ctx.createGain();
           this.masterGain.gain.value = 0.25;
           
-          // Chain: Compressor -> Limiter -> Master
-          this.compressor = this.ctx.createDynamicsCompressor();
-          this.compressor.threshold.value = -12;
-          this.compressor.knee.value = 4;
-          this.compressor.ratio.value = 8;
-          this.compressor.attack.value = 0.001;
-          this.compressor.release.value = 0.1;
-          
           this.limiter = this.ctx.createDynamicsCompressor();
-          this.limiter.threshold.value = -3;
+          this.limiter.threshold.value = -2;
           this.limiter.ratio.value = 20;
           this.limiter.attack.value = 0.001;
-          this.limiter.release.value = 0.05;
           
-          this.compressor.connect(this.limiter);
           this.limiter.connect(this.masterGain);
           this.masterGain.connect(this.ctx.destination);
           
-          // Reverb
           this.convolver = this.ctx.createConvolver();
           this.wetGain = this.ctx.createGain();
-          this.wetGain.gain.value = 0.15;
+          this.wetGain.gain.value = 0.3; 
           this.dryGain = this.ctx.createGain();
-          this.dryGain.gain.value = 0.85;
+          this.dryGain.gain.value = 0.8;
           
           this.convolver.connect(this.wetGain);
-          this.wetGain.connect(this.compressor);
-          this.dryGain.connect(this.compressor);
+          this.wetGain.connect(this.limiter);
+          this.dryGain.connect(this.limiter);
           
-          this.createImpulseResponse();
+          this.createMassiveHallImpulse();
           this.initVoicePool();
         }
 
-        // FIX #1: Add ability to clear the queue instantly
-        clearQueue() {
-          this.impactQueue = [];
-          this.isProcessingQueue = false;
-          this.updateDebugDisplay();
-        }
-
-        createImpulseResponse() {
-          const length = this.ctx.sampleRate * 0.5;
+        createMassiveHallImpulse() {
+          const length = this.ctx.sampleRate * 3.0;
           const impulse = this.ctx.createBuffer(2, length, this.ctx.sampleRate);
           for (let channel = 0; channel < 2; channel++) {
             const channelData = impulse.getChannelData(channel);
             for (let i = 0; i < length; i++) {
-              channelData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, 2);
+              const decay = Math.pow(1 - i / length, 3);
+              channelData[i] = (Math.random() * 2 - 1) * decay;
             }
           }
           this.convolver.buffer = impulse;
@@ -198,183 +170,136 @@
         setVolume(val) {
           this.masterGain.gain.setTargetAtTime(val, this.ctx.currentTime, 0.05);
         }
+        
+        clearQueue() {
+          this.impactQueue = [];
+        }
 
         play(velocity = 1.0, position = null) {
           if (this.ctx.state === 'suspended') this.ctx.resume();
           const now = performance.now();
-          
-          // Queue Logic
           if (now - this.lastTriggerTime < this.minTimeBetweenTriggers) {
-            // Prevent queue from becoming infinitely large
-            if (this.impactQueue.length < 20) {
-              this.impactQueue.push({ velocity, position, time: now });
-            }
+            if (this.impactQueue.length < 15) this.impactQueue.push({ velocity, position });
             if (!this.isProcessingQueue) this.processQueue();
             return;
           }
-          
           this.lastTriggerTime = now;
-          this.triggerImpact(velocity, position);
+          this.triggerStandardImpact(velocity);
         }
 
         async processQueue() {
           this.isProcessingQueue = true;
-          // Safety break: don't loop if queue was cleared externally
           while (this.impactQueue.length > 0) {
             const now = performance.now();
             if (now - this.lastTriggerTime >= this.minTimeBetweenTriggers) {
               const impact = this.impactQueue.shift();
               this.lastTriggerTime = now;
-              this.triggerImpact(impact.velocity, impact.position);
+              this.triggerStandardImpact(impact.velocity);
             }
             await new Promise(r => setTimeout(r, 5));
           }
           this.isProcessingQueue = false;
         }
 
-        triggerImpact(velocity, position) {
+        triggerStandardImpact(velocity) {
           const voice = this.voicePool.find(v => !v.inUse);
-          if (!voice) {
-            // If all voices busy, steal the oldest one
-            const oldest = this.voicePool.reduce((o, v) => v.startTime < o.startTime ? v : o);
-            this.releaseVoice(oldest);
-            return this.triggerImpact(velocity, position);
-          }
-          
+          if (!voice) return;
           voice.inUse = true;
-          voice.startTime = this.ctx.currentTime;
-          const method = voice.id % 4;
           
-          if(method === 0) this.synthesizeImpactA(velocity, voice);
-          else if(method === 1) this.synthesizeImpactB(velocity, voice);
-          else if(method === 2) this.synthesizeImpactC(velocity, voice);
-          else this.synthesizeImpactD(velocity, voice);
-          
-          this.updateDebugDisplay();
-        }
-
-        // Deep sine
-        synthesizeImpactA(velocity, voice) {
-          const duration = 0.12 + Math.random() * 0.08;
           const osc = this.ctx.createOscillator();
           const gain = this.ctx.createGain();
+          osc.frequency.setValueAtTime(200 + Math.random()*100, this.ctx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(50, this.ctx.currentTime + 0.1);
+          
+          gain.gain.setValueAtTime(0, this.ctx.currentTime);
+          gain.gain.linearRampToValueAtTime(velocity * 0.5, this.ctx.currentTime + 0.005);
+          gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.1);
+          
           osc.connect(gain);
           gain.connect(this.dryGain);
           gain.connect(this.convolver);
-          
-          const now = this.ctx.currentTime;
-          osc.frequency.setValueAtTime(100, now);
-          osc.frequency.exponentialRampToValueAtTime(30, now + duration);
-          
-          gain.gain.setValueAtTime(0, now);
-          gain.gain.linearRampToValueAtTime(velocity * 0.8, now + 0.003);
-          gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
-          
-          osc.start(now);
-          osc.stop(now + duration);
-          setTimeout(() => this.releaseVoice(voice), duration * 1000);
+          osc.start();
+          osc.stop(this.ctx.currentTime + 0.1);
+          setTimeout(() => { voice.inUse = false; }, 120);
         }
 
-        // Noise burst
-        synthesizeImpactB(velocity, voice) {
-          const duration = 0.1;
-          const osc = this.ctx.createOscillator();
-          const gain = this.ctx.createGain();
-          osc.type = 'triangle';
-          osc.connect(gain);
-          gain.connect(this.dryGain);
-          gain.connect(this.convolver);
-
-          const now = this.ctx.currentTime;
-          osc.frequency.setValueAtTime(150, now);
-          osc.frequency.exponentialRampToValueAtTime(40, now + duration);
-
-          gain.gain.setValueAtTime(0, now);
-          gain.gain.linearRampToValueAtTime(velocity * 0.6, now + 0.002);
-          gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
-
-          osc.start(now);
-          osc.stop(now + duration);
-          setTimeout(() => this.releaseVoice(voice), duration * 1000);
-        }
-
-        // Sawtooth sweep
-        synthesizeImpactC(velocity, voice) {
-          const duration = 0.15;
-          const osc = this.ctx.createOscillator();
-          const gain = this.ctx.createGain();
-          osc.type = 'sawtooth';
+        // --- FIX: DYNAMIC PRESSURE SYNTHESIS ---
+        // density: How many balls are hitting (0 to 1)
+        // force: Slider value (0.01 to 1.5)
+        playPressureCrush(density, force) {
+          if (this.ctx.state === 'suspended') this.ctx.resume();
           
+          const now = this.ctx.currentTime;
+          
+          // FORCE PARAMETERS:
+          // Low Force: Long, Slow, Deep sound (Groaning)
+          // High Force: Short, Fast, Bright sound (Impact/Crunch)
+          
+          // Clamp inputs for safety
+          const d = Math.max(0, Math.min(1, density)); 
+          const f = Math.max(0.01, Math.min(1.5, force));
+
+          // Volume driven by Density (how many balls)
+          const masterVol = Math.min(0.8, d * 1.0); 
+
+          // Speed driven by Force (High force = faster crunch)
+          const attackTime = 0.01 + (1.5 - f) * 0.2; // High force = fast attack
+          const releaseTime = 0.2 + (1.5 - f) * 1.0; // High force = short release
+          
+          // Pitch driven by Force
+          const baseFreq = 40 + (f * 30); // 40Hz to 85Hz
+          const dropFreq = 20;
+
+          // Filter driven by Force
+          const filterFreq = 150 + (f * 1200); // 150Hz (muffled) to 1350Hz (bright)
+
+          // 1. SUB LAYER
+          const subOsc = this.ctx.createOscillator();
+          const subGain = this.ctx.createGain();
+          subOsc.type = 'sine';
+          subOsc.frequency.setValueAtTime(baseFreq, now);
+          subOsc.frequency.exponentialRampToValueAtTime(dropFreq, now + releaseTime);
+          
+          subGain.gain.setValueAtTime(0, now);
+          subGain.gain.linearRampToValueAtTime(masterVol, now + attackTime);
+          subGain.gain.exponentialRampToValueAtTime(0.001, now + releaseTime);
+
+          // 2. CRUSH LAYER (Sawtooth + Distortion)
+          const crushOsc = this.ctx.createOscillator();
+          const crushGain = this.ctx.createGain();
           const filter = this.ctx.createBiquadFilter();
+          
+          crushOsc.type = 'sawtooth';
+          // Pitch drop speed depends on Force
+          crushOsc.frequency.setValueAtTime(baseFreq * 2, now);
+          crushOsc.frequency.exponentialRampToValueAtTime(dropFreq, now + (releaseTime * 0.5));
+          
           filter.type = 'lowpass';
-          filter.Q.value = 5;
-          
-          osc.connect(filter);
-          filter.connect(gain);
-          gain.connect(this.dryGain);
-          gain.connect(this.convolver);
-          
-          const now = this.ctx.currentTime;
-          osc.frequency.value = 60;
-          filter.frequency.setValueAtTime(800, now);
-          filter.frequency.exponentialRampToValueAtTime(100, now + 0.05);
-          
-          gain.gain.setValueAtTime(0, now);
-          gain.gain.linearRampToValueAtTime(velocity * 0.5, now + 0.002);
-          gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
-          
-          osc.start(now);
-          osc.stop(now + duration);
-          setTimeout(() => this.releaseVoice(voice), duration * 1000);
-        }
+          filter.Q.value = 1 + (f * 4); // More resonance at higher force
+          filter.frequency.setValueAtTime(filterFreq, now);
+          filter.frequency.exponentialRampToValueAtTime(50, now + releaseTime);
 
-        // Metallic FM
-        synthesizeImpactD(velocity, voice) {
-          const duration = 0.1;
-          const car = this.ctx.createOscillator();
-          const mod = this.ctx.createOscillator();
-          const modG = this.ctx.createGain();
-          const gain = this.ctx.createGain();
-          
-          mod.connect(modG);
-          modG.connect(car.frequency);
-          car.connect(gain);
-          gain.connect(this.dryGain);
-          gain.connect(this.convolver);
-          
-          const now = this.ctx.currentTime;
-          car.frequency.value = 200;
-          mod.frequency.value = 420;
-          modG.gain.setValueAtTime(300, now);
-          modG.gain.exponentialRampToValueAtTime(10, now + 0.05);
-          
-          gain.gain.setValueAtTime(0, now);
-          gain.gain.linearRampToValueAtTime(velocity * 0.7, now + 0.002);
-          gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
-          
-          car.start(now);
-          car.stop(now + duration);
-          mod.start(now);
-          mod.stop(now + duration);
-          setTimeout(() => this.releaseVoice(voice), duration * 1000);
-        }
+          crushGain.gain.setValueAtTime(0, now);
+          crushGain.gain.linearRampToValueAtTime(masterVol * 0.6, now + (attackTime * 0.5));
+          crushGain.gain.exponentialRampToValueAtTime(0.001, now + (releaseTime * 0.8));
 
-        releaseVoice(voice) {
-          voice.inUse = false;
-          this.updateDebugDisplay();
-        }
+          // Routing
+          subOsc.connect(subGain);
+          subGain.connect(this.dryGain);
+          subGain.connect(this.convolver);
 
-        updateDebugDisplay() {
-          const activeCount = this.voicePool.filter(v => v.inUse).length;
-          const queueCount = this.impactQueue.length;
-          const vd = document.getElementById('voice-count');
-          const qd = document.getElementById('queue-count');
-          if(vd) vd.textContent = activeCount;
-          if(qd) qd.textContent = queueCount;
+          crushOsc.connect(filter);
+          filter.connect(crushGain);
+          crushGain.connect(this.dryGain);
+          crushGain.connect(this.convolver);
+
+          subOsc.start(now);
+          subOsc.stop(now + releaseTime + 0.1);
+          crushOsc.start(now);
+          crushOsc.stop(now + releaseTime + 0.1);
         }
       }
 
-      // --- Config ---
       const CONFIG = { 
         ballCount: 100, 
         ringPoolSize: 50, 
@@ -395,6 +320,20 @@
 
       function randomRange(min, max) { return Math.random() * (max - min) + min; }
       function randomColor(palette) { return palette[Math.floor(Math.random() * palette.length)]; }
+
+      const intensitySlider = document.getElementById('intensitySlider');
+      const volumeSlider = document.getElementById('volumeSlider');
+      intensitySlider.addEventListener('input', (e) => { 
+        state.intensity = parseFloat(e.target.value);
+        document.getElementById('val-force').innerText = state.intensity.toFixed(2);
+        document.getElementById('debug-force').innerText = state.intensity.toFixed(2);
+      });
+      volumeSlider.addEventListener('input', (e) => { 
+        state.soundVolume = parseFloat(e.target.value);
+        document.getElementById('val-vol').innerText = Math.round(state.soundVolume * 100) + '%';
+        const logic = document.querySelector('[swarm-logic]').components['swarm-logic'];
+        if (logic) logic.soundEngine.setVolume(state.soundVolume);
+      });
 
       AFRAME.registerComponent('ambient-breathing', {
         init: function() {
@@ -426,10 +365,7 @@
           this.el.object3D.lookAt(new THREE.Vector3().copy(pos).add(normal));
           this.el.object3D.visible = true;
           const mesh = this.el.getObject3D('mesh');
-          if (mesh) {
-            mesh.material.opacity = 1.0;
-            mesh.material.color.set(color);
-          }
+          if (mesh) { mesh.material.opacity = 1.0; mesh.material.color.set(color); }
         },
         tick: function(t, dt) {
           if (!this.isActive) return;
@@ -447,9 +383,11 @@
           this.balls = [];
           this.safeSphere = document.querySelector('#safe-sphere-container');
           
-          // FIX #2: Global timer to throttle pressure impacts scene-wide
-          this.lastGlobalPressureSound = 0;
-          
+          // Buckets for Pressure Mode
+          this.pressureBucketCurrent = 0;
+          this.pressureBucketPrevious = 0;
+          this.pressureTimer = 0;
+
           this.ringPool = [];
           this.poolIndex = 0;
           const poolContainer = document.querySelector('#pool-container');
@@ -480,7 +418,6 @@
             scene.appendChild(ball);
             this.balls.push(ball);
           }
-          
           this.vTemp = new THREE.Vector3(); this.vDir = new THREE.Vector3(); this.vNormal = new THREE.Vector3();
         },
 
@@ -490,6 +427,29 @@
           const bound = CONFIG.boxSize / 2;
           const origin = new THREE.Vector3(0,0,0);
           const now = performance.now();
+
+          if (state.mode === 'pressure') {
+            this.pressureTimer += timeDelta;
+            if (this.pressureTimer >= 1000) {
+              const totalImpacts = this.pressureBucketCurrent + this.pressureBucketPrevious;
+              
+              // FIX 1: Normalize against a much higher max (~2000 impacts)
+              // 100 balls * 20 impacts/sec = 2000.
+              const maxPossibleImpacts = CONFIG.ballCount * 20; 
+              const density = Math.min(1.0, totalImpacts / maxPossibleImpacts);
+
+              document.getElementById('pressure-load').innerText = Math.round(density * 100) + '%';
+
+              // FIX 2: Pass Intensity (Force) to the synth
+              this.soundEngine.playPressureCrush(density, state.intensity);
+
+              this.pressureBucketPrevious = this.pressureBucketCurrent;
+              this.pressureBucketCurrent = 0;
+              this.pressureTimer = 0;
+            }
+          } else {
+            this.pressureBucketCurrent = 0; this.pressureBucketPrevious = 0; this.pressureTimer = 0;
+          }
 
           let currentScale = this.safeSphere.object3D.scale.x;
           let scaleDiff = state.targetRadius - currentScale;
@@ -515,7 +475,10 @@
 
             let dist = pos.length();
             if (state.mode === 'chill' || state.mode === 'pushback') {
-               this.applyNormalMotion(uData);
+               uData.velocity.multiplyScalar(0.98); 
+               this.applyJitter(uData.velocity, 0.005 * state.intensity);
+               if(uData.velocity.length() < 0.02) uData.velocity.normalize().multiplyScalar(0.02);
+               uData.isAttacking = false;
             } else if (state.mode === 'attack') {
                if (uData.attackCooldown > 0) uData.attackCooldown -= dt;
                if (!uData.isAttacking && uData.attackCooldown <= 0) {
@@ -540,35 +503,24 @@
             if (Math.abs(pos.y) > bound) { pos.y = Math.sign(pos.y)*bound; uData.velocity.y *= -0.8; }
             if (Math.abs(pos.z) > bound) { pos.z = Math.sign(pos.z)*bound; uData.velocity.z *= -0.8; }
 
-            // SPHERE COLLISION
             let minDist = currentRadius + CONFIG.ballRadius;
             if (dist < minDist) {
                this.vNormal.copy(pos).normalize();
-               
-               const canPlayBallSound = (now - uData.lastImpactTime) > CONFIG.collisionCooldown;
+               const canPlaySound = (now - uData.lastImpactTime) > CONFIG.collisionCooldown;
 
                if (state.mode === 'attack' && uData.isAttacking) {
-                  if (canPlayBallSound) {
-                    const impactVelocity = Math.min(1.0, uData.velocity.length() * 0.3);
-                    this.soundEngine.play(impactVelocity, pos);
+                  this.spawnRing(pos, this.vNormal, uData.currentColor);
+                  if (canPlaySound) {
+                    this.soundEngine.play(Math.min(1.0, uData.velocity.length() * 0.3), pos);
                     uData.lastImpactTime = now;
                   }
-                  this.spawnRing(pos, this.vNormal, uData.currentColor);
                   uData.isAttacking = false; uData.attackCooldown = 0.5;
                   uData.velocity.multiplyScalar(0.2); 
                } 
                else if (state.mode === 'pressure') {
-                  // FIX #3: THROTTLED PRESSURE SOUNDS
-                  // Only play if the global scene timer allows it (every 35ms max)
-                  // AND the specific ball cooldown is ready.
-                  const globalCooldownReady = (now - this.lastGlobalPressureSound) > 35;
-
-                  if (canPlayBallSound && globalCooldownReady) {
-                      const pressureVol = Math.min(0.8, 0.3 + (state.intensity * 0.5));
-                      this.soundEngine.play(pressureVol, pos);
-                      
+                  if (canPlaySound) {
+                      this.pressureBucketCurrent++; 
                       uData.lastImpactTime = now;
-                      this.lastGlobalPressureSound = now; // Reset global timer
                       this.spawnRing(pos, this.vNormal, uData.currentColor);
                   }
                }
@@ -582,13 +534,6 @@
           }
           
           if (['pressure', 'chill', 'pushback'].includes(state.mode)) this.handleBallCollisions(); 
-        },
-
-        applyNormalMotion: function(uData) {
-           uData.velocity.multiplyScalar(0.98); 
-           this.applyJitter(uData.velocity, 0.005 * state.intensity);
-           if(uData.velocity.length() < 0.02) uData.velocity.normalize().multiplyScalar(0.02);
-           uData.isAttacking = false;
         },
         
         spawnRing: function(pos, normal, color) {
@@ -608,7 +553,6 @@
                    this.vTemp.copy(b1).sub(b2).normalize();
                    let overlap = (minDist - dist) * 0.5;
                    b1.addScaledVector(this.vTemp, overlap); b2.addScaledVector(this.vTemp, -overlap);
-                   
                    let v1 = this.balls[i].userData.velocity; let v2 = this.balls[j].userData.velocity;
                    this.vDir.copy(this.vTemp).multiplyScalar(0.01); 
                    v1.add(this.vDir).multiplyScalar(0.95); v2.sub(this.vDir).multiplyScalar(0.95);
@@ -622,29 +566,9 @@
         }
       });
 
-      const intensitySlider = document.getElementById('intensitySlider');
-      const volumeSlider = document.getElementById('volumeSlider');
-      const forceValDisp = document.getElementById('val-force');
-      const volValDisp = document.getElementById('val-vol');
-
-      intensitySlider.addEventListener('input', (e) => { 
-        state.intensity = parseFloat(e.target.value);
-        forceValDisp.innerText = state.intensity.toFixed(2);
-      });
-
-      volumeSlider.addEventListener('input', (e) => { 
-        state.soundVolume = parseFloat(e.target.value);
-        volValDisp.innerText = Math.round(state.soundVolume * 100) + '%';
-        const logic = document.querySelector('[swarm-logic]').components['swarm-logic'];
-        if (logic && logic.soundEngine) logic.soundEngine.setVolume(state.soundVolume);
-      });
-
       function setMode(mode) {
-        // FIX #4: CLEAR THE AUDIO QUEUE WHEN SWITCHING MODES
         const logic = document.querySelector('[swarm-logic]').components['swarm-logic'];
-        if (logic && logic.soundEngine) {
-          logic.soundEngine.clearQueue();
-        }
+        if (logic) logic.soundEngine.clearQueue();
 
         state.mode = mode;
         document.querySelectorAll('button').forEach(b => b.classList.remove('active'));
