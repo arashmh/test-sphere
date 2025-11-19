@@ -21,6 +21,9 @@
             padding: 15px;
             border-radius: 15px;
             backdrop-filter: blur(10px);
+            max-width: 95vw;
+            flex-wrap: wrap;
+            justify-content: center;
         }
         
         .mode-btn {
@@ -97,6 +100,20 @@
         #chill-btn:hover {
             background: linear-gradient(135deg, #87DEEB, #5F9EA0);
             box-shadow: 0 4px 15px rgba(135, 206, 235, 0.4);
+        }
+
+        @media (max-width: 768px) {
+            #controls {
+                bottom: 10px;
+                padding: 10px;
+                gap: 5px;
+            }
+
+            .mode-btn {
+                padding: 8px 12px;
+                font-size: 12px;
+                min-width: 70px;
+            }
         }
     </style>
 </head>

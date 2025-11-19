@@ -23,6 +23,7 @@
         backdrop-filter: blur(12px);
         border: 1px solid rgba(255, 255, 255, 0.15);
         box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+        max-width: 95vw;
       }
 
       #btn-row { display: flex; gap: 10px; }
@@ -83,6 +84,30 @@
         cursor: pointer;
         background: rgba(255,255,255,0.2);
         border-radius: 2px;
+      }
+
+      @media (max-width: 768px) {
+        #ui-container {
+          bottom: 10px;
+          padding: 12px;
+          gap: 10px;
+        }
+
+        #btn-row {
+          flex-wrap: wrap;
+          gap: 6px;
+        }
+
+        button {
+          padding: 8px 12px;
+          font-size: 11px;
+          min-width: 65px;
+        }
+
+        .slider-container {
+          font-size: 10px;
+          gap: 10px;
+        }
       }
     </style>
   </head>
