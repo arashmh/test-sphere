@@ -119,32 +119,25 @@
     <script>
       /**
        * ENHANCED IMPACT ENGINE
-       * - Better voice allocation with time-based spacing
-       * - Multiple synthesis techniques to avoid phase issues
-       * - Smart queuing system for rapid impacts
-       * - Frequency spreading to reduce interference
        */
       class EnhancedImpactEngine {
         constructor() {
           const AudioContext = window.AudioContext || window.webkitAudioContext;
           this.ctx = new AudioContext();
           
-          // Voice management
-          this.maxVoices = 6; // Increased slightly for better overlap handling
+          this.maxVoices = 8; 
           this.activeVoices = [];
           this.voicePool = [];
           
-          // Timing control
           this.lastTriggerTime = 0;
-          this.minTimeBetweenTriggers = 15; // ms between triggers
+          this.minTimeBetweenTriggers = 15; 
           this.impactQueue = [];
           this.isProcessingQueue = false;
           
-          // Audio routing
           this.masterGain = this.ctx.createGain();
           this.masterGain.gain.value = 0.25;
           
-          // Multi-band compression for cleaner mix
+          // Chain: Compressor -> Limiter -> Master
           this.compressor = this.ctx.createDynamicsCompressor();
           this.compressor.threshold.value = -12;
           this.compressor.knee.value = 4;
@@ -152,27 +145,23 @@
           this.compressor.attack.value = 0.001;
           this.compressor.release.value = 0.1;
           
-          // Limiter to prevent clipping
           this.limiter = this.ctx.createDynamicsCompressor();
           this.limiter.threshold.value = -3;
-          this.limiter.knee.value = 0;
           this.limiter.ratio.value = 20;
           this.limiter.attack.value = 0.001;
           this.limiter.release.value = 0.05;
           
-          // Signal chain
           this.compressor.connect(this.limiter);
           this.limiter.connect(this.masterGain);
           this.masterGain.connect(this.ctx.destination);
           
-          // Convolution reverb for spatial depth
+          // Reverb
           this.convolver = this.ctx.createConvolver();
           this.wetGain = this.ctx.createGain();
           this.wetGain.gain.value = 0.15;
           this.dryGain = this.ctx.createGain();
           this.dryGain.gain.value = 0.85;
           
-          // Reverb routing
           this.convolver.connect(this.wetGain);
           this.wetGain.connect(this.compressor);
           this.dryGain.connect(this.compressor);
@@ -181,29 +170,28 @@
           this.initVoicePool();
         }
 
+        // FIX #1: Add ability to clear the queue instantly
+        clearQueue() {
+          this.impactQueue = [];
+          this.isProcessingQueue = false;
+          this.updateDebugDisplay();
+        }
+
         createImpulseResponse() {
-          // Short room reverb
           const length = this.ctx.sampleRate * 0.5;
           const impulse = this.ctx.createBuffer(2, length, this.ctx.sampleRate);
-          
           for (let channel = 0; channel < 2; channel++) {
             const channelData = impulse.getChannelData(channel);
             for (let i = 0; i < length; i++) {
               channelData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, 2);
             }
           }
-          
           this.convolver.buffer = impulse;
         }
 
         initVoicePool() {
-          // Pre-allocate voices for better performance
           for (let i = 0; i < this.maxVoices; i++) {
-            this.voicePool.push({
-              id: i,
-              inUse: false,
-              startTime: 0
-            });
+            this.voicePool.push({ id: i, inUse: false, startTime: 0 });
           }
         }
 
@@ -213,15 +201,15 @@
 
         play(velocity = 1.0, position = null) {
           if (this.ctx.state === 'suspended') this.ctx.resume();
-          
           const now = performance.now();
           
-          // Queue management to prevent overlap artifacts
+          // Queue Logic
           if (now - this.lastTriggerTime < this.minTimeBetweenTriggers) {
-            this.impactQueue.push({ velocity, position, time: now });
-            if (!this.isProcessingQueue) {
-              this.processQueue();
+            // Prevent queue from becoming infinitely large
+            if (this.impactQueue.length < 20) {
+              this.impactQueue.push({ velocity, position, time: now });
             }
+            if (!this.isProcessingQueue) this.processQueue();
             return;
           }
           
@@ -231,259 +219,158 @@
 
         async processQueue() {
           this.isProcessingQueue = true;
-          
+          // Safety break: don't loop if queue was cleared externally
           while (this.impactQueue.length > 0) {
             const now = performance.now();
-            const timeSinceLastTrigger = now - this.lastTriggerTime;
-            
-            if (timeSinceLastTrigger >= this.minTimeBetweenTriggers) {
+            if (now - this.lastTriggerTime >= this.minTimeBetweenTriggers) {
               const impact = this.impactQueue.shift();
               this.lastTriggerTime = now;
               this.triggerImpact(impact.velocity, impact.position);
             }
-            
-            await new Promise(resolve => setTimeout(resolve, 5));
+            await new Promise(r => setTimeout(r, 5));
           }
-          
           this.isProcessingQueue = false;
         }
 
         triggerImpact(velocity, position) {
-          // Find available voice
           const voice = this.voicePool.find(v => !v.inUse);
           if (!voice) {
-            // Force-release oldest voice
-            const oldestVoice = this.voicePool.reduce((oldest, v) => 
-              v.startTime < oldest.startTime ? v : oldest
-            );
-            this.releaseVoice(oldestVoice);
+            // If all voices busy, steal the oldest one
+            const oldest = this.voicePool.reduce((o, v) => v.startTime < o.startTime ? v : o);
+            this.releaseVoice(oldest);
             return this.triggerImpact(velocity, position);
           }
           
           voice.inUse = true;
           voice.startTime = this.ctx.currentTime;
-          
-          // Choose synthesis method based on voice ID to ensure variety
           const method = voice.id % 4;
           
-          switch(method) {
-            case 0:
-              this.synthesizeImpactA(velocity, voice);
-              break;
-            case 1:
-              this.synthesizeImpactB(velocity, voice);
-              break;
-            case 2:
-              this.synthesizeImpactC(velocity, voice);
-              break;
-            case 3:
-              this.synthesizeImpactD(velocity, voice);
-              break;
-          }
+          if(method === 0) this.synthesizeImpactA(velocity, voice);
+          else if(method === 1) this.synthesizeImpactB(velocity, voice);
+          else if(method === 2) this.synthesizeImpactC(velocity, voice);
+          else this.synthesizeImpactD(velocity, voice);
           
           this.updateDebugDisplay();
         }
 
+        // Deep sine
         synthesizeImpactA(velocity, voice) {
-          // Deep sine with pitch envelope
           const duration = 0.12 + Math.random() * 0.08;
-          const startFreq = 80 + Math.random() * 30;
-          const endFreq = 25 + Math.random() * 10;
-          
           const osc = this.ctx.createOscillator();
           const gain = this.ctx.createGain();
-          const filter = this.ctx.createBiquadFilter();
-          
-          osc.type = 'sine';
-          filter.type = 'lowpass';
-          filter.frequency.value = 200;
-          filter.Q.value = 2;
-          
-          osc.connect(filter);
-          filter.connect(gain);
+          osc.connect(gain);
           gain.connect(this.dryGain);
           gain.connect(this.convolver);
           
           const now = this.ctx.currentTime;
+          osc.frequency.setValueAtTime(100, now);
+          osc.frequency.exponentialRampToValueAtTime(30, now + duration);
           
-          // Frequency envelope
-          osc.frequency.setValueAtTime(startFreq, now);
-          osc.frequency.exponentialRampToValueAtTime(endFreq, now + duration);
-          
-          // Amplitude envelope with soft attack
           gain.gain.setValueAtTime(0, now);
           gain.gain.linearRampToValueAtTime(velocity * 0.8, now + 0.003);
           gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
           
           osc.start(now);
           osc.stop(now + duration);
-          
           setTimeout(() => this.releaseVoice(voice), duration * 1000);
         }
 
+        // Noise burst
         synthesizeImpactB(velocity, voice) {
-          // Triangle wave with noise burst
-          const duration = 0.10 + Math.random() * 0.05;
-          
-          const osc = this.ctx.createOscillator();
-          const noise = this.ctx.createBufferSource();
-          const oscGain = this.ctx.createGain();
-          const noiseGain = this.ctx.createGain();
-          const filter = this.ctx.createBiquadFilter();
-          
-          // Create noise buffer
-          const noiseBuffer = this.ctx.createBuffer(1, this.ctx.sampleRate * 0.05, this.ctx.sampleRate);
-          const noiseData = noiseBuffer.getChannelData(0);
-          for (let i = 0; i < noiseData.length; i++) {
-            noiseData[i] = Math.random() * 2 - 1;
-          }
-          noise.buffer = noiseBuffer;
-          
-          osc.type = 'triangle';
-          filter.type = 'bandpass';
-          filter.frequency.value = 150;
-          filter.Q.value = 1;
-          
-          osc.connect(oscGain);
-          noise.connect(noiseGain);
-          oscGain.connect(filter);
-          noiseGain.connect(filter);
-          filter.connect(this.dryGain);
-          filter.connect(this.convolver);
-          
-          const now = this.ctx.currentTime;
-          
-          // Oscillator
-          osc.frequency.setValueAtTime(120 + Math.random() * 40, now);
-          osc.frequency.exponentialRampToValueAtTime(30, now + duration);
-          
-          // Envelopes
-          oscGain.gain.setValueAtTime(0, now);
-          oscGain.gain.linearRampToValueAtTime(velocity * 0.6, now + 0.002);
-          oscGain.gain.exponentialRampToValueAtTime(0.001, now + duration);
-          
-          noiseGain.gain.setValueAtTime(velocity * 0.2, now);
-          noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.02);
-          
-          osc.start(now);
-          osc.stop(now + duration);
-          noise.start(now);
-          noise.stop(now + 0.02);
-          
-          setTimeout(() => this.releaseVoice(voice), duration * 1000);
-        }
-
-        synthesizeImpactC(velocity, voice) {
-          // Sawtooth with resonant filter sweep
-          const duration = 0.15 + Math.random() * 0.05;
-          
+          const duration = 0.1;
           const osc = this.ctx.createOscillator();
           const gain = this.ctx.createGain();
-          const filter = this.ctx.createBiquadFilter();
-          const filter2 = this.ctx.createBiquadFilter();
-          
-          osc.type = 'sawtooth';
-          
-          filter.type = 'lowpass';
-          filter.Q.value = 8;
-          
-          filter2.type = 'highpass';
-          filter2.frequency.value = 30;
-          
-          osc.connect(filter);
-          filter.connect(filter2);
-          filter2.connect(gain);
+          osc.type = 'triangle';
+          osc.connect(gain);
           gain.connect(this.dryGain);
           gain.connect(this.convolver);
-          
+
           const now = this.ctx.currentTime;
-          const baseFreq = 60 + Math.random() * 20;
-          
-          // Oscillator frequency
-          osc.frequency.setValueAtTime(baseFreq, now);
-          osc.frequency.exponentialRampToValueAtTime(baseFreq * 0.5, now + duration);
-          
-          // Filter sweep
-          filter.frequency.setValueAtTime(800, now);
-          filter.frequency.exponentialRampToValueAtTime(100, now + 0.05);
-          
-          // Amplitude envelope
+          osc.frequency.setValueAtTime(150, now);
+          osc.frequency.exponentialRampToValueAtTime(40, now + duration);
+
           gain.gain.setValueAtTime(0, now);
-          gain.gain.linearRampToValueAtTime(velocity * 0.5, now + 0.001);
-          gain.gain.setValueAtTime(velocity * 0.5, now + 0.005);
+          gain.gain.linearRampToValueAtTime(velocity * 0.6, now + 0.002);
           gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
-          
+
           osc.start(now);
           osc.stop(now + duration);
-          
           setTimeout(() => this.releaseVoice(voice), duration * 1000);
         }
 
-        synthesizeImpactD(velocity, voice) {
-          // FM synthesis for metallic impact
-          const duration = 0.08 + Math.random() * 0.04;
-          
-          const carrier = this.ctx.createOscillator();
-          const modulator = this.ctx.createOscillator();
-          const modGain = this.ctx.createGain();
+        // Sawtooth sweep
+        synthesizeImpactC(velocity, voice) {
+          const duration = 0.15;
+          const osc = this.ctx.createOscillator();
           const gain = this.ctx.createGain();
+          osc.type = 'sawtooth';
+          
           const filter = this.ctx.createBiquadFilter();
+          filter.type = 'lowpass';
+          filter.Q.value = 5;
           
-          carrier.type = 'sine';
-          modulator.type = 'sine';
-          
-          filter.type = 'bandpass';
-          filter.frequency.value = 250;
-          filter.Q.value = 2;
-          
-          // FM routing
-          modulator.connect(modGain);
-          modGain.connect(carrier.frequency);
-          carrier.connect(filter);
+          osc.connect(filter);
           filter.connect(gain);
           gain.connect(this.dryGain);
           gain.connect(this.convolver);
           
           const now = this.ctx.currentTime;
-          const carrierFreq = 100 + Math.random() * 50;
-          const modFreq = carrierFreq * (2.1 + Math.random() * 0.4);
+          osc.frequency.value = 60;
+          filter.frequency.setValueAtTime(800, now);
+          filter.frequency.exponentialRampToValueAtTime(100, now + 0.05);
           
-          // Set frequencies
-          carrier.frequency.setValueAtTime(carrierFreq, now);
-          modulator.frequency.setValueAtTime(modFreq, now);
-          
-          // Modulation index envelope
-          modGain.gain.setValueAtTime(200, now);
-          modGain.gain.exponentialRampToValueAtTime(10, now + 0.03);
-          
-          // Amplitude envelope
           gain.gain.setValueAtTime(0, now);
-          gain.gain.linearRampToValueAtTime(velocity * 0.7, now + 0.001);
+          gain.gain.linearRampToValueAtTime(velocity * 0.5, now + 0.002);
           gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
           
-          carrier.start(now);
-          carrier.stop(now + duration);
-          modulator.start(now);
-          modulator.stop(now + duration);
+          osc.start(now);
+          osc.stop(now + duration);
+          setTimeout(() => this.releaseVoice(voice), duration * 1000);
+        }
+
+        // Metallic FM
+        synthesizeImpactD(velocity, voice) {
+          const duration = 0.1;
+          const car = this.ctx.createOscillator();
+          const mod = this.ctx.createOscillator();
+          const modG = this.ctx.createGain();
+          const gain = this.ctx.createGain();
           
+          mod.connect(modG);
+          modG.connect(car.frequency);
+          car.connect(gain);
+          gain.connect(this.dryGain);
+          gain.connect(this.convolver);
+          
+          const now = this.ctx.currentTime;
+          car.frequency.value = 200;
+          mod.frequency.value = 420;
+          modG.gain.setValueAtTime(300, now);
+          modG.gain.exponentialRampToValueAtTime(10, now + 0.05);
+          
+          gain.gain.setValueAtTime(0, now);
+          gain.gain.linearRampToValueAtTime(velocity * 0.7, now + 0.002);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+          
+          car.start(now);
+          car.stop(now + duration);
+          mod.start(now);
+          mod.stop(now + duration);
           setTimeout(() => this.releaseVoice(voice), duration * 1000);
         }
 
         releaseVoice(voice) {
           voice.inUse = false;
-          voice.startTime = 0;
           this.updateDebugDisplay();
         }
 
         updateDebugDisplay() {
           const activeCount = this.voicePool.filter(v => v.inUse).length;
           const queueCount = this.impactQueue.length;
-          
-          const voiceDisplay = document.getElementById('voice-count');
-          const queueDisplay = document.getElementById('queue-count');
-          
-          if (voiceDisplay) voiceDisplay.textContent = activeCount;
-          if (queueDisplay) queueDisplay.textContent = queueCount;
+          const vd = document.getElementById('voice-count');
+          const qd = document.getElementById('queue-count');
+          if(vd) vd.textContent = activeCount;
+          if(qd) qd.textContent = queueCount;
         }
       }
 
@@ -494,7 +381,7 @@
         boxSize: 5, 
         ballRadius: 0.1, 
         defaultSphereRadius: 1.5,
-        collisionCooldown: 50 // ms between impacts per ball
+        collisionCooldown: 50 
       };
       
       const PALETTES = {
@@ -506,11 +393,9 @@
 
       let state = { mode: 'chill', intensity: 0.1, soundVolume: 0.25, targetRadius: 1.5 };
 
-      // --- Helpers ---
       function randomRange(min, max) { return Math.random() * (max - min) + min; }
       function randomColor(palette) { return palette[Math.floor(Math.random() * palette.length)]; }
 
-      // --- Components ---
       AFRAME.registerComponent('ambient-breathing', {
         init: function() {
           this.colorA = new THREE.Color('#00d2d3'); 
@@ -530,51 +415,28 @@
 
       AFRAME.registerComponent('pooled-ring', {
         init: function() {
-          this.isActive = false; 
-          this.lifeTime = 0; 
-          this.timer = 0;
-          this.el.setAttribute('geometry', { 
-            primitive: 'ring', 
-            radiusInner: CONFIG.ballRadius * 0.85, 
-            radiusOuter: CONFIG.ballRadius, 
-            segmentsTheta: 32 
-          });
-          this.el.setAttribute('material', { 
-            color: '#ffd700', 
-            shader: 'flat', 
-            transparent: true, 
-            opacity: 0, 
-            side: 'double', 
-            blending: 'additive', 
-            depthTest: false, 
-            depthWrite: false 
-          });
+          this.isActive = false; this.lifeTime = 0; this.timer = 0;
+          this.el.setAttribute('geometry', { primitive: 'ring', radiusInner: CONFIG.ballRadius * 0.85, radiusOuter: CONFIG.ballRadius, segmentsTheta: 32 });
+          this.el.setAttribute('material', { color: '#ffd700', shader: 'flat', transparent: true, opacity: 0, side: 'double', blending: 'additive', depthTest: false, depthWrite: false });
           this.el.object3D.visible = false;
         },
-        activate: function(pos, normal, color = '#ffd700') {
-          this.isActive = true; 
-          this.timer = 0; 
-          this.lifeTime = 400 + Math.random() * 600; 
+        activate: function(pos, normal, color) {
+          this.isActive = true; this.timer = 0; this.lifeTime = 400 + Math.random() * 600; 
           this.el.object3D.position.copy(pos).addScaledVector(normal, 0.02);
           this.el.object3D.lookAt(new THREE.Vector3().copy(pos).add(normal));
           this.el.object3D.visible = true;
-          if (this.el.getObject3D('mesh')) {
-            this.el.getObject3D('mesh').material.opacity = 1.0;
-            this.el.getObject3D('mesh').material.color.set(color);
+          const mesh = this.el.getObject3D('mesh');
+          if (mesh) {
+            mesh.material.opacity = 1.0;
+            mesh.material.color.set(color);
           }
         },
         tick: function(t, dt) {
           if (!this.isActive) return;
           this.timer += dt;
-          if (this.timer >= this.lifeTime) { 
-            this.isActive = false; 
-            this.el.object3D.visible = false; 
-            return; 
-          }
+          if (this.timer >= this.lifeTime) { this.isActive = false; this.el.object3D.visible = false; return; }
           const progress = this.timer / this.lifeTime;
-          if (this.el.getObject3D('mesh')) {
-            this.el.getObject3D('mesh').material.opacity = 1.0 - progress;
-          }
+          if (this.el.getObject3D('mesh')) this.el.getObject3D('mesh').material.opacity = 1.0 - progress;
         }
       });
 
@@ -584,6 +446,9 @@
           this.soundEngine = new EnhancedImpactEngine();
           this.balls = [];
           this.safeSphere = document.querySelector('#safe-sphere-container');
+          
+          // FIX #2: Global timer to throttle pressure impacts scene-wide
+          this.lastGlobalPressureSound = 0;
           
           this.ringPool = [];
           this.poolIndex = 0;
@@ -599,37 +464,24 @@
           for(let i=0; i<CONFIG.ballCount; i++) {
             let ball = document.createElement('a-sphere');
             ball.setAttribute('radius', CONFIG.ballRadius);
-            ball.setAttribute('segments-width', 8); 
-            ball.setAttribute('segments-height', 8);
+            ball.setAttribute('segments-width', 8); ball.setAttribute('segments-height', 8);
             ball.setAttribute('material', 'shader: standard; roughness: 0.3; metalness: 0.5;');
             
-            let pos = new THREE.Vector3(
-              randomRange(-bound, bound), 
-              randomRange(-bound, bound), 
-              randomRange(-bound, bound)
-            );
-            
-            if (pos.length() < CONFIG.defaultSphereRadius) {
-              pos.setLength(CONFIG.defaultSphereRadius + 0.5);
-            }
+            let pos = new THREE.Vector3(randomRange(-bound, bound), randomRange(-bound, bound), randomRange(-bound, bound));
+            if (pos.length() < CONFIG.defaultSphereRadius) pos.setLength(CONFIG.defaultSphereRadius + 0.5);
             
             ball.object3D.position.copy(pos);
             ball.userData = { 
               velocity: new THREE.Vector3(0,0,0), 
               colorTarget: new THREE.Color(randomColor(PALETTES.chill)), 
               currentColor: new THREE.Color(randomColor(PALETTES.chill)), 
-              isAttacking: false, 
-              attackCooldown: 0,
-              lastImpactTime: 0 // Track last impact for cooldown
+              isAttacking: false, attackCooldown: 0, lastImpactTime: 0 
             };
-            
             scene.appendChild(ball);
             this.balls.push(ball);
           }
           
-          this.vTemp = new THREE.Vector3(); 
-          this.vDir = new THREE.Vector3(); 
-          this.vNormal = new THREE.Vector3();
+          this.vTemp = new THREE.Vector3(); this.vDir = new THREE.Vector3(); this.vNormal = new THREE.Vector3();
         },
 
         tick: function(time, timeDelta) {
@@ -639,7 +491,6 @@
           const origin = new THREE.Vector3(0,0,0);
           const now = performance.now();
 
-          // Sphere Scaling
           let currentScale = this.safeSphere.object3D.scale.x;
           let scaleDiff = state.targetRadius - currentScale;
           if (Math.abs(scaleDiff) > 0.001) {
@@ -649,13 +500,11 @@
           }
           const currentRadius = 1.5 * this.safeSphere.object3D.scale.x;
 
-          // Ball Loop
           for (let i = 0; i < this.balls.length; i++) {
             let ball = this.balls[i];
             let uData = ball.userData;
             let pos = ball.object3D.position;
 
-            // Color
             uData.currentColor.lerp(uData.colorTarget, 0.08);
             const mesh = ball.getObject3D('mesh');
             if(mesh) { 
@@ -664,7 +513,6 @@
               mesh.material.emissiveIntensity = 0.5; 
             }
 
-            // Logic
             let dist = pos.length();
             if (state.mode === 'chill' || state.mode === 'pushback') {
                this.applyNormalMotion(uData);
@@ -674,8 +522,7 @@
                   if (Math.random() < 0.02 * state.intensity) {
                      uData.isAttacking = true;
                      this.vDir.copy(origin).sub(pos).normalize();
-                     let speed = 3.5 + (state.intensity * 2.0);
-                     uData.velocity.copy(this.vDir).multiplyScalar(speed * dt);
+                     uData.velocity.copy(this.vDir).multiplyScalar((3.5 + state.intensity * 2.0) * dt);
                   } else {
                      this.applyJitter(uData.velocity, 0.02 * state.intensity);
                   }
@@ -689,46 +536,41 @@
             
             pos.add(uData.velocity);
 
-            // Wall Collisions
-            if (Math.abs(pos.x) > bound) { 
-              pos.x = Math.sign(pos.x)*bound; 
-              uData.velocity.x *= -0.8; 
-            }
-            if (Math.abs(pos.y) > bound) { 
-              pos.y = Math.sign(pos.y)*bound; 
-              uData.velocity.y *= -0.8; 
-            }
-            if (Math.abs(pos.z) > bound) { 
-              pos.z = Math.sign(pos.z)*bound; 
-              uData.velocity.z *= -0.8; 
-            }
+            if (Math.abs(pos.x) > bound) { pos.x = Math.sign(pos.x)*bound; uData.velocity.x *= -0.8; }
+            if (Math.abs(pos.y) > bound) { pos.y = Math.sign(pos.y)*bound; uData.velocity.y *= -0.8; }
+            if (Math.abs(pos.z) > bound) { pos.z = Math.sign(pos.z)*bound; uData.velocity.z *= -0.8; }
 
-            // Sphere Collision
+            // SPHERE COLLISION
             let minDist = currentRadius + CONFIG.ballRadius;
             if (dist < minDist) {
                this.vNormal.copy(pos).normalize();
-
-               // Check collision cooldown to prevent rapid repeated sounds
-               const canPlaySound = (now - uData.lastImpactTime) > CONFIG.collisionCooldown;
+               
+               const canPlayBallSound = (now - uData.lastImpactTime) > CONFIG.collisionCooldown;
 
                if (state.mode === 'attack' && uData.isAttacking) {
-                  this.spawnRing(pos, this.vNormal, uData.currentColor);
-                  
-                  // Play sound with velocity-based volume
-                  if (canPlaySound) {
+                  if (canPlayBallSound) {
                     const impactVelocity = Math.min(1.0, uData.velocity.length() * 0.3);
                     this.soundEngine.play(impactVelocity, pos);
                     uData.lastImpactTime = now;
                   }
-
-                  uData.isAttacking = false;
-                  uData.attackCooldown = 0.5;
+                  this.spawnRing(pos, this.vNormal, uData.currentColor);
+                  uData.isAttacking = false; uData.attackCooldown = 0.5;
                   uData.velocity.multiplyScalar(0.2); 
-               } else if (state.mode === 'pressure' && canPlaySound && uData.velocity.length() > 0.5) {
-                  // Softer impacts in pressure mode
-                  this.soundEngine.play(0.3, pos);
-                  uData.lastImpactTime = now;
-                  this.spawnRing(pos, this.vNormal, '#8e44ad');
+               } 
+               else if (state.mode === 'pressure') {
+                  // FIX #3: THROTTLED PRESSURE SOUNDS
+                  // Only play if the global scene timer allows it (every 35ms max)
+                  // AND the specific ball cooldown is ready.
+                  const globalCooldownReady = (now - this.lastGlobalPressureSound) > 35;
+
+                  if (canPlayBallSound && globalCooldownReady) {
+                      const pressureVol = Math.min(0.8, 0.3 + (state.intensity * 0.5));
+                      this.soundEngine.play(pressureVol, pos);
+                      
+                      uData.lastImpactTime = now;
+                      this.lastGlobalPressureSound = now; // Reset global timer
+                      this.spawnRing(pos, this.vNormal, uData.currentColor);
+                  }
                }
 
                let vDotN = uData.velocity.dot(this.vNormal);
@@ -739,63 +581,47 @@
             }
           }
           
-          if (['pressure', 'chill', 'pushback'].includes(state.mode)) { 
-            this.handleBallCollisions(); 
-          }
+          if (['pressure', 'chill', 'pushback'].includes(state.mode)) this.handleBallCollisions(); 
         },
 
         applyNormalMotion: function(uData) {
            uData.velocity.multiplyScalar(0.98); 
            this.applyJitter(uData.velocity, 0.005 * state.intensity);
-           if(uData.velocity.length() < 0.02) {
-             uData.velocity.normalize().multiplyScalar(0.02);
-           }
+           if(uData.velocity.length() < 0.02) uData.velocity.normalize().multiplyScalar(0.02);
            uData.isAttacking = false;
         },
         
-        spawnRing: function(pos, normal, color = '#ffd700') {
+        spawnRing: function(pos, normal, color) {
             let poolEl = this.ringPool[this.poolIndex];
             this.poolIndex = (this.poolIndex + 1) % this.ringPool.length;
-            if (poolEl.components['pooled-ring']) {
-              poolEl.components['pooled-ring'].activate(pos, normal, color);
-            }
+            if (poolEl.components['pooled-ring']) poolEl.components['pooled-ring'].activate(pos, normal, color);
         },
         
         handleBallCollisions: function() {
-           let minDist = CONFIG.ballRadius * 2; 
-           let minDistSq = minDist * minDist;
-           
+           let minDist = CONFIG.ballRadius * 2; let minDistSq = minDist * minDist;
            for (let i = 0; i < this.balls.length; i++) {
              for (let j = i + 1; j < this.balls.length; j++) {
-                let b1 = this.balls[i].object3D.position; 
-                let b2 = this.balls[j].object3D.position;
+                let b1 = this.balls[i].object3D.position; let b2 = this.balls[j].object3D.position;
                 let distSq = b1.distanceToSquared(b2);
-                
                 if (distSq < minDistSq) {
                    let dist = Math.sqrt(distSq);
                    this.vTemp.copy(b1).sub(b2).normalize();
                    let overlap = (minDist - dist) * 0.5;
-                   b1.addScaledVector(this.vTemp, overlap); 
-                   b2.addScaledVector(this.vTemp, -overlap);
+                   b1.addScaledVector(this.vTemp, overlap); b2.addScaledVector(this.vTemp, -overlap);
                    
-                   let v1 = this.balls[i].userData.velocity; 
-                   let v2 = this.balls[j].userData.velocity;
+                   let v1 = this.balls[i].userData.velocity; let v2 = this.balls[j].userData.velocity;
                    this.vDir.copy(this.vTemp).multiplyScalar(0.01); 
-                   v1.add(this.vDir).multiplyScalar(0.95); 
-                   v2.sub(this.vDir).multiplyScalar(0.95);
+                   v1.add(this.vDir).multiplyScalar(0.95); v2.sub(this.vDir).multiplyScalar(0.95);
                 }
              }
            }
         },
         
         applyJitter: function(vel, force) {
-           vel.x += randomRange(-force, force); 
-           vel.y += randomRange(-force, force); 
-           vel.z += randomRange(-force, force);
+           vel.x += randomRange(-force, force); vel.y += randomRange(-force, force); vel.z += randomRange(-force, force);
         }
       });
 
-      // --- UI & State Management ---
       const intensitySlider = document.getElementById('intensitySlider');
       const volumeSlider = document.getElementById('volumeSlider');
       const forceValDisp = document.getElementById('val-force');
@@ -814,14 +640,15 @@
       });
 
       function setMode(mode) {
+        // FIX #4: CLEAR THE AUDIO QUEUE WHEN SWITCHING MODES
+        const logic = document.querySelector('[swarm-logic]').components['swarm-logic'];
+        if (logic && logic.soundEngine) {
+          logic.soundEngine.clearQueue();
+        }
+
         state.mode = mode;
         document.querySelectorAll('button').forEach(b => b.classList.remove('active'));
-        const idMap = { 
-          'attack': 'btn-attack', 
-          'pressure': 'btn-pressure', 
-          'pushback': 'btn-push', 
-          'chill': 'btn-chill' 
-        };
+        const idMap = { 'attack': 'btn-attack', 'pressure': 'btn-pressure', 'pushback': 'btn-push', 'chill': 'btn-chill' };
         document.getElementById(idMap[mode]).classList.add('active');
         
         if (mode === 'chill') state.targetRadius = 1.5;
@@ -829,10 +656,9 @@
         if (mode === 'pressure') state.targetRadius = 0.7; 
         if (mode === 'pushback') state.targetRadius = 1.5; 
         
-        const logic = document.querySelector('[swarm-logic]').components['swarm-logic'];
-        logic.balls.forEach(ball => { 
-          ball.userData.colorTarget.set(randomColor(PALETTES[mode])); 
-        });
+        if(logic) {
+          logic.balls.forEach(ball => { ball.userData.colorTarget.set(randomColor(PALETTES[mode])); });
+        }
       }
     </script>
   </body>
