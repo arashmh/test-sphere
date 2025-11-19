@@ -55,10 +55,10 @@
 
         .gallery {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(4, 1fr);
             gap: 2rem;
             margin-top: 3rem;
-            max-width: 1400px;
+            max-width: 1600px;
             margin-left: auto;
             margin-right: auto;
         }
@@ -144,6 +144,10 @@
             box-shadow: 0 20px 60px rgba(0, 210, 255, 0.4);
         }
 
+        .card:nth-child(4):hover {
+            box-shadow: 0 20px 60px rgba(46, 213, 115, 0.4);
+        }
+
         @media (max-width: 768px) {
             body {
                 padding: 20px 0;
@@ -210,6 +214,14 @@
                     Sentient spheres with dual attack modes. Toggle between ring impacts and ripple effects for unique interactions.
                 </p>
                 <a href="gemini_2.html" class="card-link">Enter →</a>
+            </div>
+
+            <div class="card" onclick="window.location.href='gemini_3.html'">
+                <h2 class="card-title">Gemini III</h2>
+                <p class="card-description">
+                    Natural push mechanics with advanced swarm behavior. Features smooth physics and dynamic force interactions.
+                </p>
+                <a href="gemini_3.html" class="card-link">Enter →</a>
             </div>
         </div>
     </div>
