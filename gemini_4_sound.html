@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>A-Frame Swarm: Enhanced Audio System</title>
+    <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
+    <style>
+      body { margin: 0; overflow: hidden; font-family: 'Segoe UI', sans-serif; user-select: none; }
+      
+      #ui-container {
+        position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
+        z-index: 100; display: flex; flex-direction: column; align-items: center;
+        gap: 15px; background: rgba(0, 0, 0, 0.85); padding: 20px;
+        border-radius: 24px; backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        box-shadow: 0 10px 30px rgba(0,0,0,0.6); max-width: 95vw;
+      }
+
+      #btn-row { display: flex; gap: 10px; }
+
+      button {
+        background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.2);
+        color: #ddd; padding: 10px 20px; font-size: 13px; text-transform: uppercase;
+        letter-spacing: 1px; cursor: pointer; border-radius: 12px; transition: all 0.2s ease;
+        outline: none; font-weight: 700;
+      }
+      button:hover { background: rgba(255, 255, 255, 0.2); transform: translateY(-2px); }
+
+      button#btn-attack.active { background: #ff4757; border-color: #ff4757; color: white; box-shadow: 0 0 20px rgba(255, 71, 87, 0.5); }
+      button#btn-pressure.active { background: #ffa502; border-color: #ffa502; color: white; box-shadow: 0 0 20px rgba(255, 165, 2, 0.5); }
+      button#btn-push.active { background: #bdc3c7; border-color: #bdc3c7; color: #333; box-shadow: 0 0 20px rgba(189, 195, 199, 0.5); }
+      button#btn-chill.active { background: #2ed573; border-color: #2ed573; color: white; box-shadow: 0 0 20px rgba(46, 213, 115, 0.5); }
+
+      .slider-row { width: 100%; display: flex; flex-direction: row; gap: 25px; min-width: 300px; }
+      
+      .slider-container { 
+        display: flex; flex-direction: column; gap: 8px; flex: 1; 
+        color: rgba(255,255,255,0.9); font-size: 11px; text-transform: uppercase; font-weight: 600; 
+      }
+      
+      .label-row {
+        display: flex; justify-content: space-between; width: 100%;
+      }
+
+      .val-display {
+        color: #00eaff; font-family: monospace; font-size: 12px;
+      }
+      
+      input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; }
+      input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 14px; width: 14px; border-radius: 50%; background: #ffffff; cursor: pointer; margin-top: -5px; box-shadow: 0 0 8px rgba(255,255,255,0.8); }
+      input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; cursor: pointer; background: rgba(255,255,255,0.2); border-radius: 2px; }
+
+      #audio-debug {
+        position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.7);
+        color: #0f0; font-family: monospace; font-size: 11px; padding: 8px;
+        border-radius: 4px; display: none;
+      }
+    </style>
+  </head>
+  <body>
+
+    <div id="audio-debug">
+      Voices: <span id="voice-count">0</span> | 
+      Queue: <span id="queue-count">0</span>
+    </div>
+
+    <div id="ui-container">
+      <div id="btn-row">
+        <button id="btn-attack" onclick="setMode('attack')">Attack</button>
+        <button id="btn-pressure" onclick="setMode('pressure')">Pressure</button>
+        <button id="btn-push" onclick="setMode('pushback')">Push Back</button>
+        <button id="btn-chill" class="active" onclick="setMode('chill')">Chill</button>
+      </div>
+      
+      <div class="slider-row">
+        <!-- Force Slider: 0.01 to 1.5 -->
+        <div class="slider-container">
+          <div class="label-row">
+            <span>Swarm Force</span>
+            <span id="val-force" class="val-display">0.10</span>
+          </div>
+          <input type="range" id="intensitySlider" min="0.01" max="1.5" step="0.01" value="0.1">
+        </div>
+
+        <!-- Volume Slider -->
+        <div class="slider-container">
+          <div class="label-row">
+            <span>Impact Vol</span>
+            <span id="val-vol" class="val-display">25%</span>
+          </div>
+          <input type="range" id="volumeSlider" min="0.0" max="1.0" step="0.05" value="0.25">
+        </div>
+      </div>
+    </div>
+
+    <a-scene background="color: #050508" renderer="antialias: true; colorManagement: true; sortObjects: true;">
+      
+      <a-entity light="type: ambient; intensity: 0.3; color: #ffffff"></a-entity>
+      <a-entity light="type: point; intensity: 1.2; distance: 10; decay: 2; color: #00eaff" position="0 0 0"></a-entity>
+      <a-entity light="type: directional; intensity: 0.5; position: 2 4 3"></a-entity>
+
+      <!-- Safe Sphere -->
+      <a-entity id="safe-sphere-container" position="0 0 0" ambient-breathing>
+        <a-sphere id="safe-core" radius="1.5" segments-width="64" segments-height="64" material="color: #00a8ff; opacity: 0.12; transparent: true; roughness: 0.1; metalness: 0.0; side: double; blending: additive; depthWrite: false"></a-sphere>
+        <a-sphere id="safe-wire" radius="1.51" segments-width="24" segments-height="16" material="color: #48dbfb; wireframe: true; opacity: 0.2; transparent: true; side: double; depthWrite: false"></a-sphere>
+      </a-entity>
+
+      <a-box position="0 0 0" width="5" height="5" depth="5" material="wireframe: true; color: #333; opacity: 0.3"></a-box>
+
+      <a-entity id="swarm-controller" swarm-logic></a-entity>
+      <a-entity id="pool-container"></a-entity>
+
+      <a-entity position="0 0 6">
+        <a-camera look-controls wasd-controls="fly: true; acceleration: 30"></a-camera>
+      </a-entity>
+
+    </a-scene>
+
+    <script>
+      /**
+       * ENHANCED IMPACT ENGINE
+       * - Better voice allocation with time-based spacing
+       * - Multiple synthesis techniques to avoid phase issues
+       * - Smart queuing system for rapid impacts
+       * - Frequency spreading to reduce interference
+       */
+      class EnhancedImpactEngine {
+        constructor() {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          this.ctx = new AudioContext();
+          
+          // Voice management
+          this.maxVoices = 6; // Increased slightly for better overlap handling
+          this.activeVoices = [];
+          this.voicePool = [];
+          
+          // Timing control
+          this.lastTriggerTime = 0;
+          this.minTimeBetweenTriggers = 15; // ms between triggers
+          this.impactQueue = [];
+          this.isProcessingQueue = false;
+          
+          // Audio routing
+          this.masterGain = this.ctx.createGain();
+          this.masterGain.gain.value = 0.25;
+          
+          // Multi-band compression for cleaner mix
+          this.compressor = this.ctx.createDynamicsCompressor();
+          this.compressor.threshold.value = -12;
+          this.compressor.knee.value = 4;
+          this.compressor.ratio.value = 8;
+          this.compressor.attack.value = 0.001;
+          this.compressor.release.value = 0.1;
+          
+          // Limiter to prevent clipping
+          this.limiter = this.ctx.createDynamicsCompressor();
+          this.limiter.threshold.value = -3;
+          this.limiter.knee.value = 0;
+          this.limiter.ratio.value = 20;
+          this.limiter.attack.value = 0.001;
+          this.limiter.release.value = 0.05;
+          
+          // Signal chain
+          this.compressor.connect(this.limiter);
+          this.limiter.connect(this.masterGain);
+          this.masterGain.connect(this.ctx.destination);
+          
+          // Convolution reverb for spatial depth
+          this.convolver = this.ctx.createConvolver();
+          this.wetGain = this.ctx.createGain();
+          this.wetGain.gain.value = 0.15;
+          this.dryGain = this.ctx.createGain();
+          this.dryGain.gain.value = 0.85;
+          
+          // Reverb routing
+          this.convolver.connect(this.wetGain);
+          this.wetGain.connect(this.compressor);
+          this.dryGain.connect(this.compressor);
+          
+          this.createImpulseResponse();
+          this.initVoicePool();
+        }
+
+        createImpulseResponse() {
+          // Short room reverb
+          const length = this.ctx.sampleRate * 0.5;
+          const impulse = this.ctx.createBuffer(2, length, this.ctx.sampleRate);
+          
+          for (let channel = 0; channel < 2; channel++) {
+            const channelData = impulse.getChannelData(channel);
+            for (let i = 0; i < length; i++) {
+              channelData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, 2);
+            }
+          }
+          
+          this.convolver.buffer = impulse;
+        }
+
+        initVoicePool() {
+          // Pre-allocate voices for better performance
+          for (let i = 0; i < this.maxVoices; i++) {
+            this.voicePool.push({
+              id: i,
+              inUse: false,
+              startTime: 0
+            });
+          }
+        }
+
+        setVolume(val) {
+          this.masterGain.gain.setTargetAtTime(val, this.ctx.currentTime, 0.05);
+        }
+
+        play(velocity = 1.0, position = null) {
+          if (this.ctx.state === 'suspended') this.ctx.resume();
+          
+          const now = performance.now();
+          
+          // Queue management to prevent overlap artifacts
+          if (now - this.lastTriggerTime < this.minTimeBetweenTriggers) {
+            this.impactQueue.push({ velocity, position, time: now });
+            if (!this.isProcessingQueue) {
+              this.processQueue();
+            }
+            return;
+          }
+          
+          this.lastTriggerTime = now;
+          this.triggerImpact(velocity, position);
+        }
+
+        async processQueue() {
+          this.isProcessingQueue = true;
+          
+          while (this.impactQueue.length > 0) {
+            const now = performance.now();
+            const timeSinceLastTrigger = now - this.lastTriggerTime;
+            
+            if (timeSinceLastTrigger >= this.minTimeBetweenTriggers) {
+              const impact = this.impactQueue.shift();
+              this.lastTriggerTime = now;
+              this.triggerImpact(impact.velocity, impact.position);
+            }
+            
+            await new Promise(resolve => setTimeout(resolve, 5));
+          }
+          
+          this.isProcessingQueue = false;
+        }
+
+        triggerImpact(velocity, position) {
+          // Find available voice
+          const voice = this.voicePool.find(v => !v.inUse);
+          if (!voice) {
+            // Force-release oldest voice
+            const oldestVoice = this.voicePool.reduce((oldest, v) => 
+              v.startTime < oldest.startTime ? v : oldest
+            );
+            this.releaseVoice(oldestVoice);
+            return this.triggerImpact(velocity, position);
+          }
+          
+          voice.inUse = true;
+          voice.startTime = this.ctx.currentTime;
+          
+          // Choose synthesis method based on voice ID to ensure variety
+          const method = voice.id % 4;
+          
+          switch(method) {
+            case 0:
+              this.synthesizeImpactA(velocity, voice);
+              break;
+            case 1:
+              this.synthesizeImpactB(velocity, voice);
+              break;
+            case 2:
+              this.synthesizeImpactC(velocity, voice);
+              break;
+            case 3:
+              this.synthesizeImpactD(velocity, voice);
+              break;
+          }
+          
+          this.updateDebugDisplay();
+        }
+
+        synthesizeImpactA(velocity, voice) {
+          // Deep sine with pitch envelope
+          const duration = 0.12 + Math.random() * 0.08;
+          const startFreq = 80 + Math.random() * 30;
+          const endFreq = 25 + Math.random() * 10;
+          
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          const filter = this.ctx.createBiquadFilter();
+          
+          osc.type = 'sine';
+          filter.type = 'lowpass';
+          filter.frequency.value = 200;
+          filter.Q.value = 2;
+          
+          osc.connect(filter);
+          filter.connect(gain);
+          gain.connect(this.dryGain);
+          gain.connect(this.convolver);
+          
+          const now = this.ctx.currentTime;
+          
+          // Frequency envelope
+          osc.frequency.setValueAtTime(startFreq, now);
+          osc.frequency.exponentialRampToValueAtTime(endFreq, now + duration);
+          
+          // Amplitude envelope with soft attack
+          gain.gain.setValueAtTime(0, now);
+          gain.gain.linearRampToValueAtTime(velocity * 0.8, now + 0.003);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+          
+          osc.start(now);
+          osc.stop(now + duration);
+          
+          setTimeout(() => this.releaseVoice(voice), duration * 1000);
+        }
+
+        synthesizeImpactB(velocity, voice) {
+          // Triangle wave with noise burst
+          const duration = 0.10 + Math.random() * 0.05;
+          
+          const osc = this.ctx.createOscillator();
+          const noise = this.ctx.createBufferSource();
+          const oscGain = this.ctx.createGain();
+          const noiseGain = this.ctx.createGain();
+          const filter = this.ctx.createBiquadFilter();
+          
+          // Create noise buffer
+          const noiseBuffer = this.ctx.createBuffer(1, this.ctx.sampleRate * 0.05, this.ctx.sampleRate);
+          const noiseData = noiseBuffer.getChannelData(0);
+          for (let i = 0; i < noiseData.length; i++) {
+            noiseData[i] = Math.random() * 2 - 1;
+          }
+          noise.buffer = noiseBuffer;
+          
+          osc.type = 'triangle';
+          filter.type = 'bandpass';
+          filter.frequency.value = 150;
+          filter.Q.value = 1;
+          
+          osc.connect(oscGain);
+          noise.connect(noiseGain);
+          oscGain.connect(filter);
+          noiseGain.connect(filter);
+          filter.connect(this.dryGain);
+          filter.connect(this.convolver);
+          
+          const now = this.ctx.currentTime;
+          
+          // Oscillator
+          osc.frequency.setValueAtTime(120 + Math.random() * 40, now);
+          osc.frequency.exponentialRampToValueAtTime(30, now + duration);
+          
+          // Envelopes
+          oscGain.gain.setValueAtTime(0, now);
+          oscGain.gain.linearRampToValueAtTime(velocity * 0.6, now + 0.002);
+          oscGain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+          
+          noiseGain.gain.setValueAtTime(velocity * 0.2, now);
+          noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.02);
+          
+          osc.start(now);
+          osc.stop(now + duration);
+          noise.start(now);
+          noise.stop(now + 0.02);
+          
+          setTimeout(() => this.releaseVoice(voice), duration * 1000);
+        }
+
+        synthesizeImpactC(velocity, voice) {
+          // Sawtooth with resonant filter sweep
+          const duration = 0.15 + Math.random() * 0.05;
+          
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          const filter = this.ctx.createBiquadFilter();
+          const filter2 = this.ctx.createBiquadFilter();
+          
+          osc.type = 'sawtooth';
+          
+          filter.type = 'lowpass';
+          filter.Q.value = 8;
+          
+          filter2.type = 'highpass';
+          filter2.frequency.value = 30;
+          
+          osc.connect(filter);
+          filter.connect(filter2);
+          filter2.connect(gain);
+          gain.connect(this.dryGain);
+          gain.connect(this.convolver);
+          
+          const now = this.ctx.currentTime;
+          const baseFreq = 60 + Math.random() * 20;
+          
+          // Oscillator frequency
+          osc.frequency.setValueAtTime(baseFreq, now);
+          osc.frequency.exponentialRampToValueAtTime(baseFreq * 0.5, now + duration);
+          
+          // Filter sweep
+          filter.frequency.setValueAtTime(800, now);
+          filter.frequency.exponentialRampToValueAtTime(100, now + 0.05);
+          
+          // Amplitude envelope
+          gain.gain.setValueAtTime(0, now);
+          gain.gain.linearRampToValueAtTime(velocity * 0.5, now + 0.001);
+          gain.gain.setValueAtTime(velocity * 0.5, now + 0.005);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+          
+          osc.start(now);
+          osc.stop(now + duration);
+          
+          setTimeout(() => this.releaseVoice(voice), duration * 1000);
+        }
+
+        synthesizeImpactD(velocity, voice) {
+          // FM synthesis for metallic impact
+          const duration = 0.08 + Math.random() * 0.04;
+          
+          const carrier = this.ctx.createOscillator();
+          const modulator = this.ctx.createOscillator();
+          const modGain = this.ctx.createGain();
+          const gain = this.ctx.createGain();
+          const filter = this.ctx.createBiquadFilter();
+          
+          carrier.type = 'sine';
+          modulator.type = 'sine';
+          
+          filter.type = 'bandpass';
+          filter.frequency.value = 250;
+          filter.Q.value = 2;
+          
+          // FM routing
+          modulator.connect(modGain);
+          modGain.connect(carrier.frequency);
+          carrier.connect(filter);
+          filter.connect(gain);
+          gain.connect(this.dryGain);
+          gain.connect(this.convolver);
+          
+          const now = this.ctx.currentTime;
+          const carrierFreq = 100 + Math.random() * 50;
+          const modFreq = carrierFreq * (2.1 + Math.random() * 0.4);
+          
+          // Set frequencies
+          carrier.frequency.setValueAtTime(carrierFreq, now);
+          modulator.frequency.setValueAtTime(modFreq, now);
+          
+          // Modulation index envelope
+          modGain.gain.setValueAtTime(200, now);
+          modGain.gain.exponentialRampToValueAtTime(10, now + 0.03);
+          
+          // Amplitude envelope
+          gain.gain.setValueAtTime(0, now);
+          gain.gain.linearRampToValueAtTime(velocity * 0.7, now + 0.001);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+          
+          carrier.start(now);
+          carrier.stop(now + duration);
+          modulator.start(now);
+          modulator.stop(now + duration);
+          
+          setTimeout(() => this.releaseVoice(voice), duration * 1000);
+        }
+
+        releaseVoice(voice) {
+          voice.inUse = false;
+          voice.startTime = 0;
+          this.updateDebugDisplay();
+        }
+
+        updateDebugDisplay() {
+          const activeCount = this.voicePool.filter(v => v.inUse).length;
+          const queueCount = this.impactQueue.length;
+          
+          const voiceDisplay = document.getElementById('voice-count');
+          const queueDisplay = document.getElementById('queue-count');
+          
+          if (voiceDisplay) voiceDisplay.textContent = activeCount;
+          if (queueDisplay) queueDisplay.textContent = queueCount;
+        }
+      }
+
+      // --- Config ---
+      const CONFIG = { 
+        ballCount: 100, 
+        ringPoolSize: 50, 
+        boxSize: 5, 
+        ballRadius: 0.1, 
+        defaultSphereRadius: 1.5,
+        collisionCooldown: 50 // ms between impacts per ball
+      };
+      
+      const PALETTES = {
+        chill:     ['#00d2d3', '#48dbfb', '#0abde3', '#54a0ff'], 
+        attack:    ['#ff4757', '#ff6b81', '#e17055', '#d63031'], 
+        pressure:  ['#8e44ad', '#9b59b6', '#f1c40f', '#e67e22'], 
+        pushback:  ['#bdc3c7', '#ecf0f1', '#95a5a6', '#7f8c8d']  
+      };
+
+      let state = { mode: 'chill', intensity: 0.1, soundVolume: 0.25, targetRadius: 1.5 };
+
+      // --- Helpers ---
+      function randomRange(min, max) { return Math.random() * (max - min) + min; }
+      function randomColor(palette) { return palette[Math.floor(Math.random() * palette.length)]; }
+
+      // --- Components ---
+      AFRAME.registerComponent('ambient-breathing', {
+        init: function() {
+          this.colorA = new THREE.Color('#00d2d3'); 
+          this.colorB = new THREE.Color('#006266'); 
+          this.currentColor = new THREE.Color();
+          this.core = this.el.querySelector('#safe-core'); 
+          this.wire = this.el.querySelector('#safe-wire');
+        },
+        tick: function(time) {
+          const alpha = (Math.sin(time * 0.001) + 1) / 2;
+          this.currentColor.copy(this.colorB).lerp(this.colorA, alpha);
+          const hex = this.currentColor.getHex();
+          if(this.core) this.core.getObject3D('mesh').material.color.setHex(hex);
+          if(this.wire) this.wire.getObject3D('mesh').material.color.setHex(hex);
+        }
+      });
+
+      AFRAME.registerComponent('pooled-ring', {
+        init: function() {
+          this.isActive = false; 
+          this.lifeTime = 0; 
+          this.timer = 0;
+          this.el.setAttribute('geometry', { 
+            primitive: 'ring', 
+            radiusInner: CONFIG.ballRadius * 0.85, 
+            radiusOuter: CONFIG.ballRadius, 
+            segmentsTheta: 32 
+          });
+          this.el.setAttribute('material', { 
+            color: '#ffd700', 
+            shader: 'flat', 
+            transparent: true, 
+            opacity: 0, 
+            side: 'double', 
+            blending: 'additive', 
+            depthTest: false, 
+            depthWrite: false 
+          });
+          this.el.object3D.visible = false;
+        },
+        activate: function(pos, normal, color = '#ffd700') {
+          this.isActive = true; 
+          this.timer = 0; 
+          this.lifeTime = 400 + Math.random() * 600; 
+          this.el.object3D.position.copy(pos).addScaledVector(normal, 0.02);
+          this.el.object3D.lookAt(new THREE.Vector3().copy(pos).add(normal));
+          this.el.object3D.visible = true;
+          if (this.el.getObject3D('mesh')) {
+            this.el.getObject3D('mesh').material.opacity = 1.0;
+            this.el.getObject3D('mesh').material.color.set(color);
+          }
+        },
+        tick: function(t, dt) {
+          if (!this.isActive) return;
+          this.timer += dt;
+          if (this.timer >= this.lifeTime) { 
+            this.isActive = false; 
+            this.el.object3D.visible = false; 
+            return; 
+          }
+          const progress = this.timer / this.lifeTime;
+          if (this.el.getObject3D('mesh')) {
+            this.el.getObject3D('mesh').material.opacity = 1.0 - progress;
+          }
+        }
+      });
+
+      AFRAME.registerComponent('swarm-logic', {
+        init: function() {
+          const scene = this.el.sceneEl;
+          this.soundEngine = new EnhancedImpactEngine();
+          this.balls = [];
+          this.safeSphere = document.querySelector('#safe-sphere-container');
+          
+          this.ringPool = [];
+          this.poolIndex = 0;
+          const poolContainer = document.querySelector('#pool-container');
+          for(let i=0; i<CONFIG.ringPoolSize; i++) {
+             let el = document.createElement('a-entity');
+             el.setAttribute('pooled-ring', '');
+             poolContainer.appendChild(el);
+             this.ringPool.push(el);
+          }
+
+          const bound = CONFIG.boxSize / 2;
+          for(let i=0; i<CONFIG.ballCount; i++) {
+            let ball = document.createElement('a-sphere');
+            ball.setAttribute('radius', CONFIG.ballRadius);
+            ball.setAttribute('segments-width', 8); 
+            ball.setAttribute('segments-height', 8);
+            ball.setAttribute('material', 'shader: standard; roughness: 0.3; metalness: 0.5;');
+            
+            let pos = new THREE.Vector3(
+              randomRange(-bound, bound), 
+              randomRange(-bound, bound), 
+              randomRange(-bound, bound)
+            );
+            
+            if (pos.length() < CONFIG.defaultSphereRadius) {
+              pos.setLength(CONFIG.defaultSphereRadius + 0.5);
+            }
+            
+            ball.object3D.position.copy(pos);
+            ball.userData = { 
+              velocity: new THREE.Vector3(0,0,0), 
+              colorTarget: new THREE.Color(randomColor(PALETTES.chill)), 
+              currentColor: new THREE.Color(randomColor(PALETTES.chill)), 
+              isAttacking: false, 
+              attackCooldown: 0,
+              lastImpactTime: 0 // Track last impact for cooldown
+            };
+            
+            scene.appendChild(ball);
+            this.balls.push(ball);
+          }
+          
+          this.vTemp = new THREE.Vector3(); 
+          this.vDir = new THREE.Vector3(); 
+          this.vNormal = new THREE.Vector3();
+        },
+
+        tick: function(time, timeDelta) {
+          if (timeDelta > 100) return;
+          const dt = timeDelta / 1000; 
+          const bound = CONFIG.boxSize / 2;
+          const origin = new THREE.Vector3(0,0,0);
+          const now = performance.now();
+
+          // Sphere Scaling
+          let currentScale = this.safeSphere.object3D.scale.x;
+          let scaleDiff = state.targetRadius - currentScale;
+          if (Math.abs(scaleDiff) > 0.001) {
+            let speed = (state.mode === 'pushback') ? 0.3 : 2.0; 
+            let newScale = currentScale + (scaleDiff * speed * dt);
+            this.safeSphere.object3D.scale.set(newScale, newScale, newScale);
+          }
+          const currentRadius = 1.5 * this.safeSphere.object3D.scale.x;
+
+          // Ball Loop
+          for (let i = 0; i < this.balls.length; i++) {
+            let ball = this.balls[i];
+            let uData = ball.userData;
+            let pos = ball.object3D.position;
+
+            // Color
+            uData.currentColor.lerp(uData.colorTarget, 0.08);
+            const mesh = ball.getObject3D('mesh');
+            if(mesh) { 
+              mesh.material.color.setHex(uData.currentColor.getHex()); 
+              mesh.material.emissive.setHex(uData.currentColor.getHex()); 
+              mesh.material.emissiveIntensity = 0.5; 
+            }
+
+            // Logic
+            let dist = pos.length();
+            if (state.mode === 'chill' || state.mode === 'pushback') {
+               this.applyNormalMotion(uData);
+            } else if (state.mode === 'attack') {
+               if (uData.attackCooldown > 0) uData.attackCooldown -= dt;
+               if (!uData.isAttacking && uData.attackCooldown <= 0) {
+                  if (Math.random() < 0.02 * state.intensity) {
+                     uData.isAttacking = true;
+                     this.vDir.copy(origin).sub(pos).normalize();
+                     let speed = 3.5 + (state.intensity * 2.0);
+                     uData.velocity.copy(this.vDir).multiplyScalar(speed * dt);
+                  } else {
+                     this.applyJitter(uData.velocity, 0.02 * state.intensity);
+                  }
+               }
+            } else if (state.mode === 'pressure') {
+               this.vDir.copy(origin).sub(pos).normalize();
+               uData.velocity.addScaledVector(this.vDir, 0.04 * state.intensity);
+               uData.velocity.multiplyScalar(0.96);
+               uData.isAttacking = false;
+            }
+            
+            pos.add(uData.velocity);
+
+            // Wall Collisions
+            if (Math.abs(pos.x) > bound) { 
+              pos.x = Math.sign(pos.x)*bound; 
+              uData.velocity.x *= -0.8; 
+            }
+            if (Math.abs(pos.y) > bound) { 
+              pos.y = Math.sign(pos.y)*bound; 
+              uData.velocity.y *= -0.8; 
+            }
+            if (Math.abs(pos.z) > bound) { 
+              pos.z = Math.sign(pos.z)*bound; 
+              uData.velocity.z *= -0.8; 
+            }
+
+            // Sphere Collision
+            let minDist = currentRadius + CONFIG.ballRadius;
+            if (dist < minDist) {
+               this.vNormal.copy(pos).normalize();
+
+               // Check collision cooldown to prevent rapid repeated sounds
+               const canPlaySound = (now - uData.lastImpactTime) > CONFIG.collisionCooldown;
+
+               if (state.mode === 'attack' && uData.isAttacking) {
+                  this.spawnRing(pos, this.vNormal, uData.currentColor);
+                  
+                  // Play sound with velocity-based volume
+                  if (canPlaySound) {
+                    const impactVelocity = Math.min(1.0, uData.velocity.length() * 0.3);
+                    this.soundEngine.play(impactVelocity, pos);
+                    uData.lastImpactTime = now;
+                  }
+
+                  uData.isAttacking = false;
+                  uData.attackCooldown = 0.5;
+                  uData.velocity.multiplyScalar(0.2); 
+               } else if (state.mode === 'pressure' && canPlaySound && uData.velocity.length() > 0.5) {
+                  // Softer impacts in pressure mode
+                  this.soundEngine.play(0.3, pos);
+                  uData.lastImpactTime = now;
+                  this.spawnRing(pos, this.vNormal, '#8e44ad');
+               }
+
+               let vDotN = uData.velocity.dot(this.vNormal);
+               this.vTemp.copy(this.vNormal).multiplyScalar(2 * vDotN);
+               uData.velocity.sub(this.vTemp);
+               pos.copy(this.vNormal).multiplyScalar(minDist);
+               uData.velocity.addScaledVector(this.vNormal, 0.01);
+            }
+          }
+          
+          if (['pressure', 'chill', 'pushback'].includes(state.mode)) { 
+            this.handleBallCollisions(); 
+          }
+        },
+
+        applyNormalMotion: function(uData) {
+           uData.velocity.multiplyScalar(0.98); 
+           this.applyJitter(uData.velocity, 0.005 * state.intensity);
+           if(uData.velocity.length() < 0.02) {
+             uData.velocity.normalize().multiplyScalar(0.02);
+           }
+           uData.isAttacking = false;
+        },
+        
+        spawnRing: function(pos, normal, color = '#ffd700') {
+            let poolEl = this.ringPool[this.poolIndex];
+            this.poolIndex = (this.poolIndex + 1) % this.ringPool.length;
+            if (poolEl.components['pooled-ring']) {
+              poolEl.components['pooled-ring'].activate(pos, normal, color);
+            }
+        },
+        
+        handleBallCollisions: function() {
+           let minDist = CONFIG.ballRadius * 2; 
+           let minDistSq = minDist * minDist;
+           
+           for (let i = 0; i < this.balls.length; i++) {
+             for (let j = i + 1; j < this.balls.length; j++) {
+                let b1 = this.balls[i].object3D.position; 
+                let b2 = this.balls[j].object3D.position;
+                let distSq = b1.distanceToSquared(b2);
+                
+                if (distSq < minDistSq) {
+                   let dist = Math.sqrt(distSq);
+                   this.vTemp.copy(b1).sub(b2).normalize();
+                   let overlap = (minDist - dist) * 0.5;
+                   b1.addScaledVector(this.vTemp, overlap); 
+                   b2.addScaledVector(this.vTemp, -overlap);
+                   
+                   let v1 = this.balls[i].userData.velocity; 
+                   let v2 = this.balls[j].userData.velocity;
+                   this.vDir.copy(this.vTemp).multiplyScalar(0.01); 
+                   v1.add(this.vDir).multiplyScalar(0.95); 
+                   v2.sub(this.vDir).multiplyScalar(0.95);
+                }
+             }
+           }
+        },
+        
+        applyJitter: function(vel, force) {
+           vel.x += randomRange(-force, force); 
+           vel.y += randomRange(-force, force); 
+           vel.z += randomRange(-force, force);
+        }
+      });
+
+      // --- UI & State Management ---
+      const intensitySlider = document.getElementById('intensitySlider');
+      const volumeSlider = document.getElementById('volumeSlider');
+      const forceValDisp = document.getElementById('val-force');
+      const volValDisp = document.getElementById('val-vol');
+
+      intensitySlider.addEventListener('input', (e) => { 
+        state.intensity = parseFloat(e.target.value);
+        forceValDisp.innerText = state.intensity.toFixed(2);
+      });
+
+      volumeSlider.addEventListener('input', (e) => { 
+        state.soundVolume = parseFloat(e.target.value);
+        volValDisp.innerText = Math.round(state.soundVolume * 100) + '%';
+        const logic = document.querySelector('[swarm-logic]').components['swarm-logic'];
+        if (logic && logic.soundEngine) logic.soundEngine.setVolume(state.soundVolume);
+      });
+
+      function setMode(mode) {
+        state.mode = mode;
+        document.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+        const idMap = { 
+          'attack': 'btn-attack', 
+          'pressure': 'btn-pressure', 
+          'pushback': 'btn-push', 
+          'chill': 'btn-chill' 
+        };
+        document.getElementById(idMap[mode]).classList.add('active');
+        
+        if (mode === 'chill') state.targetRadius = 1.5;
+        if (mode === 'attack') state.targetRadius = 1.5;
+        if (mode === 'pressure') state.targetRadius = 0.7; 
+        if (mode === 'pushback') state.targetRadius = 1.5; 
+        
+        const logic = document.querySelector('[swarm-logic]').components['swarm-logic'];
+        logic.balls.forEach(ball => { 
+          ball.userData.colorTarget.set(randomColor(PALETTES[mode])); 
+        });
+      }
+    </script>
+  </body>
+</html>
