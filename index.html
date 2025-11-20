@@ -55,10 +55,10 @@
 
         .gallery {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 2rem;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 1.5rem;
             margin-top: 3rem;
-            max-width: 1600px;
+            max-width: 1800px;
             margin-left: auto;
             margin-right: auto;
         }
@@ -148,6 +148,10 @@
             box-shadow: 0 20px 60px rgba(46, 213, 115, 0.4);
         }
 
+        .card:nth-child(5):hover {
+            box-shadow: 0 20px 60px rgba(255, 165, 2, 0.4);
+        }
+
         @media (max-width: 768px) {
             body {
                 padding: 20px 0;
@@ -222,6 +226,14 @@
                     Natural push mechanics with advanced swarm behavior. Features smooth physics and dynamic force interactions.
                 </p>
                 <a href="gemini_3.html" class="card-link">Enter →</a>
+            </div>
+
+            <div class="card" onclick="window.location.href='gemini_4_sound.html'">
+                <h2 class="card-title">Gemini IV</h2>
+                <p class="card-description">
+                    Advanced audio integration with dynamic pressure synthesis. Attack impacts and force-reactive soundscapes.
+                </p>
+                <a href="gemini_4_sound.html" class="card-link">Enter →</a>
             </div>
         </div>
     </div>
