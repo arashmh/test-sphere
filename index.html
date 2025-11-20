@@ -55,10 +55,10 @@
 
         .gallery {
             display: grid;
-            grid-template-columns: repeat(5, 1fr);
-            gap: 1.5rem;
+            grid-template-columns: 1fr;
+            gap: 2rem;
             margin-top: 3rem;
-            max-width: 1800px;
+            max-width: 600px;
             margin-left: auto;
             margin-right: auto;
         }
@@ -94,7 +94,7 @@
         .card:hover {
             transform: translateY(-10px);
             border-color: rgba(255, 255, 255, 0.3);
-            box-shadow: 0 20px 60px rgba(0, 210, 255, 0.3);
+            box-shadow: 0 20px 60px rgba(255, 165, 2, 0.4);
         }
 
         .card-title {
@@ -130,26 +130,6 @@
         .card-link:hover {
             background: rgba(255, 255, 255, 0.2);
             transform: scale(1.05);
-        }
-
-        .card:nth-child(1):hover {
-            box-shadow: 0 20px 60px rgba(0, 191, 255, 0.4);
-        }
-
-        .card:nth-child(2):hover {
-            box-shadow: 0 20px 60px rgba(72, 219, 251, 0.4);
-        }
-
-        .card:nth-child(3):hover {
-            box-shadow: 0 20px 60px rgba(0, 210, 255, 0.4);
-        }
-
-        .card:nth-child(4):hover {
-            box-shadow: 0 20px 60px rgba(46, 213, 115, 0.4);
-        }
-
-        .card:nth-child(5):hover {
-            box-shadow: 0 20px 60px rgba(255, 165, 2, 0.4);
         }
 
         @media (max-width: 768px) {
@@ -196,42 +176,10 @@
         <p class="subtitle">Interactive 3D Generative Art Gallery</p>
 
         <div class="gallery">
-            <div class="card" onclick="window.location.href='claude.html'">
-                <h2 class="card-title">Claude</h2>
-                <p class="card-description">
-                    Interactive sphere with attack, pressure, pushback, and chill modes. Features smooth physics and glowing impact effects.
-                </p>
-                <a href="claude.html" class="card-link">Enter →</a>
-            </div>
-
-            <div class="card" onclick="window.location.href='gemini_1.html'">
-                <h2 class="card-title">Gemini I</h2>
-                <p class="card-description">
-                    Advanced swarm simulation with force intensity control. Magnetic blast effects and dynamic color transitions.
-                </p>
-                <a href="gemini_1.html" class="card-link">Enter →</a>
-            </div>
-
-            <div class="card" onclick="window.location.href='gemini_2.html'">
-                <h2 class="card-title">Gemini II</h2>
-                <p class="card-description">
-                    Sentient spheres with dual attack modes. Toggle between ring impacts and ripple effects for unique interactions.
-                </p>
-                <a href="gemini_2.html" class="card-link">Enter →</a>
-            </div>
-
-            <div class="card" onclick="window.location.href='gemini_3.html'">
-                <h2 class="card-title">Gemini III</h2>
-                <p class="card-description">
-                    Natural push mechanics with advanced swarm behavior. Features smooth physics and dynamic force interactions.
-                </p>
-                <a href="gemini_3.html" class="card-link">Enter →</a>
-            </div>
-
             <div class="card" onclick="window.location.href='gemini_4_sound.html'">
-                <h2 class="card-title">Gemini IV</h2>
+                <h2 class="card-title">SAFE Sphere Audio</h2>
                 <p class="card-description">
-                    Advanced audio integration with dynamic pressure synthesis. Attack impacts and force-reactive soundscapes.
+                    Interactive 3D swarm with dynamic audio synthesis and force-reactive soundscapes.
                 </p>
                 <a href="gemini_4_sound.html" class="card-link">Enter →</a>
             </div>

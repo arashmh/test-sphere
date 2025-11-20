@@ -201,57 +201,72 @@
           this.isProcessingQueue = false;
         }
 
+        /**
+         * ULTIMATE FIX: Anti-Rattle Impact
+         * Replaced 'exponentialRampToValueAtTime' (which glitches at 0)
+         * with 'setTargetAtTime' (which is analog-smooth and click-free).
+         */
         triggerStandardImpact(velocity) {
           const voice = this.voicePool.find(v => !v.inUse);
           if (!voice) return;
           voice.inUse = true;
           
+          // Lookahead to prevent thread jitter clicks
+          const t = this.ctx.currentTime + 0.005; 
+          
           const osc = this.ctx.createOscillator();
           const gain = this.ctx.createGain();
-          osc.frequency.setValueAtTime(200 + Math.random()*100, this.ctx.currentTime);
-          osc.frequency.exponentialRampToValueAtTime(50, this.ctx.currentTime + 0.1);
           
-          gain.gain.setValueAtTime(0, this.ctx.currentTime);
-          gain.gain.linearRampToValueAtTime(velocity * 0.5, this.ctx.currentTime + 0.005);
-          gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.1);
+          // 1. FREQUENCY: Use setTargetAtTime for smoother, non-lasery drop
+          const startFreq = 180 + Math.random() * 40;
+          osc.frequency.setValueAtTime(startFreq, t);
+          osc.frequency.setTargetAtTime(40, t, 0.03); // 0.03 time constant = organic drop
+          
+          // 2. GAIN ENVELOPE: The "Silver Bullet" for clicks
+          // Linear attack to avoid popping from 0
+          gain.gain.setValueAtTime(0, t);
+          gain.gain.linearRampToValueAtTime(velocity * 0.4, t + 0.01); 
+          
+          // Smooth Exponential Decay using setTargetAtTime
+          // This mathematically approaches 0 without ever hitting the glitchy "math error" point
+          gain.gain.setTargetAtTime(0, t + 0.01, 0.04); 
           
           osc.connect(gain);
           gain.connect(this.dryGain);
           gain.connect(this.convolver);
-          osc.start();
-          osc.stop(this.ctx.currentTime + 0.1);
-          setTimeout(() => { voice.inUse = false; }, 120);
+          
+          osc.start(t);
+          
+          // 3. SAFETY STOP: Stop well after sound is silent
+          // 0.04 * 6 = 0.24s (sound is effectively -60dB by then)
+          const stopTime = t + 0.3; 
+          osc.stop(stopTime);
+          
+          setTimeout(() => { 
+            voice.inUse = false;
+            try {
+                osc.disconnect();
+                gain.disconnect();
+            } catch(e) {}
+          }, 350); // Recycle voice after audio is definitely done
         }
 
-        // --- FIX: DYNAMIC PRESSURE SYNTHESIS ---
-        // density: How many balls are hitting (0 to 1)
-        // force: Slider value (0.01 to 1.5)
+        // --- DYNAMIC PRESSURE SYNTHESIS (UNTOUCHED) ---
         playPressureCrush(density, force) {
           if (this.ctx.state === 'suspended') this.ctx.resume();
           
           const now = this.ctx.currentTime;
           
-          // FORCE PARAMETERS:
-          // Low Force: Long, Slow, Deep sound (Groaning)
-          // High Force: Short, Fast, Bright sound (Impact/Crunch)
-          
           // Clamp inputs for safety
           const d = Math.max(0, Math.min(1, density)); 
           const f = Math.max(0.01, Math.min(1.5, force));
 
-          // Volume driven by Density (how many balls)
           const masterVol = Math.min(0.8, d * 1.0); 
-
-          // Speed driven by Force (High force = faster crunch)
-          const attackTime = 0.01 + (1.5 - f) * 0.2; // High force = fast attack
-          const releaseTime = 0.2 + (1.5 - f) * 1.0; // High force = short release
-          
-          // Pitch driven by Force
-          const baseFreq = 40 + (f * 30); // 40Hz to 85Hz
+          const attackTime = 0.01 + (1.5 - f) * 0.2; 
+          const releaseTime = 0.2 + (1.5 - f) * 1.0; 
+          const baseFreq = 40 + (f * 30); 
           const dropFreq = 20;
-
-          // Filter driven by Force
-          const filterFreq = 150 + (f * 1200); // 150Hz (muffled) to 1350Hz (bright)
+          const filterFreq = 150 + (f * 1200); 
 
           // 1. SUB LAYER
           const subOsc = this.ctx.createOscillator();
@@ -264,18 +279,17 @@
           subGain.gain.linearRampToValueAtTime(masterVol, now + attackTime);
           subGain.gain.exponentialRampToValueAtTime(0.001, now + releaseTime);
 
-          // 2. CRUSH LAYER (Sawtooth + Distortion)
+          // 2. CRUSH LAYER 
           const crushOsc = this.ctx.createOscillator();
           const crushGain = this.ctx.createGain();
           const filter = this.ctx.createBiquadFilter();
           
           crushOsc.type = 'sawtooth';
-          // Pitch drop speed depends on Force
           crushOsc.frequency.setValueAtTime(baseFreq * 2, now);
           crushOsc.frequency.exponentialRampToValueAtTime(dropFreq, now + (releaseTime * 0.5));
           
           filter.type = 'lowpass';
-          filter.Q.value = 1 + (f * 4); // More resonance at higher force
+          filter.Q.value = 1 + (f * 4); 
           filter.frequency.setValueAtTime(filterFreq, now);
           filter.frequency.exponentialRampToValueAtTime(50, now + releaseTime);
 
@@ -283,7 +297,6 @@
           crushGain.gain.linearRampToValueAtTime(masterVol * 0.6, now + (attackTime * 0.5));
           crushGain.gain.exponentialRampToValueAtTime(0.001, now + (releaseTime * 0.8));
 
-          // Routing
           subOsc.connect(subGain);
           subGain.connect(this.dryGain);
           subGain.connect(this.convolver);
@@ -433,14 +446,12 @@
             if (this.pressureTimer >= 1000) {
               const totalImpacts = this.pressureBucketCurrent + this.pressureBucketPrevious;
               
-              // FIX 1: Normalize against a much higher max (~2000 impacts)
-              // 100 balls * 20 impacts/sec = 2000.
+              // Normalize against max possible impacts
               const maxPossibleImpacts = CONFIG.ballCount * 20; 
               const density = Math.min(1.0, totalImpacts / maxPossibleImpacts);
 
               document.getElementById('pressure-load').innerText = Math.round(density * 100) + '%';
 
-              // FIX 2: Pass Intensity (Force) to the synth
               this.soundEngine.playPressureCrush(density, state.intensity);
 
               this.pressureBucketPrevious = this.pressureBucketCurrent;
