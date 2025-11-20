@@ -78,9 +78,9 @@
         <div class="slider-container">
           <div class="label-row">
             <span>Master Vol</span>
-            <span id="val-vol" class="val-display">25%</span>
+            <span id="val-vol" class="val-display">30%</span>
           </div>
-          <input type="range" id="volumeSlider" min="0.0" max="1.0" step="0.05" value="0.25">
+          <input type="range" id="volumeSlider" min="0.0" max="1.0" step="0.05" value="0.30">
         </div>
       </div>
     </div>
@@ -124,7 +124,8 @@
           this.isProcessingQueue = false;
           
           this.masterGain = this.ctx.createGain();
-          this.masterGain.gain.value = 0.25;
+          // Increased default master gain slightly
+          this.masterGain.gain.value = 0.30;
           
           this.limiter = this.ctx.createDynamicsCompressor();
           this.limiter.threshold.value = -2;
@@ -202,9 +203,7 @@
         }
 
         /**
-         * ULTIMATE FIX: Anti-Rattle Impact
-         * Replaced 'exponentialRampToValueAtTime' (which glitches at 0)
-         * with 'setTargetAtTime' (which is analog-smooth and click-free).
+         * ULTIMATE FIX: Anti-Rattle Impact + VOLUME BOOST
          */
         triggerStandardImpact(velocity) {
           const voice = this.voicePool.find(v => !v.inUse);
@@ -222,10 +221,10 @@
           osc.frequency.setValueAtTime(startFreq, t);
           osc.frequency.setTargetAtTime(40, t, 0.03); // 0.03 time constant = organic drop
           
-          // 2. GAIN ENVELOPE: The "Silver Bullet" for clicks
-          // Linear attack to avoid popping from 0
+          // 2. GAIN ENVELOPE: BOOSTED VOLUME HERE
+          // Was velocity * 0.4, Now velocity * 1.5 (Huge Boost)
           gain.gain.setValueAtTime(0, t);
-          gain.gain.linearRampToValueAtTime(velocity * 0.4, t + 0.01); 
+          gain.gain.linearRampToValueAtTime(velocity * 1.5, t + 0.01); 
           
           // Smooth Exponential Decay using setTargetAtTime
           // This mathematically approaches 0 without ever hitting the glitchy "math error" point
@@ -329,7 +328,7 @@
         pushback:  ['#bdc3c7', '#ecf0f1', '#95a5a6', '#7f8c8d']  
       };
 
-      let state = { mode: 'chill', intensity: 0.1, soundVolume: 0.25, targetRadius: 1.5 };
+      let state = { mode: 'chill', intensity: 0.1, soundVolume: 0.30, targetRadius: 1.5 };
 
       function randomRange(min, max) { return Math.random() * (max - min) + min; }
       function randomColor(palette) { return palette[Math.floor(Math.random() * palette.length)]; }
