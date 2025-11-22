@@ -11,15 +11,15 @@
       #ui-container {
         position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
         z-index: 100; display: flex; flex-direction: column; align-items: center;
-        gap: 18px; /* Increased gap */
+        gap: 18px;
         background: rgba(0, 0, 0, 0.85); 
-        padding: 35px 35px 25px 35px; /* Increased top padding for the button */
+        /* KEY FIX: Added 80px padding to the right to reserve space for the minimize button */
+        padding: 35px 80px 25px 35px; 
         border-radius: 24px; backdrop-filter: blur(12px);
         border: 1px solid rgba(255, 255, 255, 0.15);
         box-shadow: 0 10px 30px rgba(0,0,0,0.6); 
-        width: 1000px; /* Made UI Wider */
+        width: 1050px; /* Made slightly wider to fit content + new padding */
         max-width: 95vw;
-        /* Transition for minimizing */
         transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1);
         opacity: 1;
         pointer-events: auto;
@@ -27,7 +27,7 @@
 
       /* State: Minimized */
       #ui-container.minimized {
-        transform: translateX(-50%) translateY(150%); /* Slide down off screen */
+        transform: translateX(-50%) translateY(150%);
         opacity: 0;
         pointer-events: none;
       }
@@ -35,16 +35,18 @@
       /* --- MINIMIZE BUTTON (Inside UI) --- */
       #btn-minimize {
         position: absolute; 
-        top: 12px; 
-        right: 12px;
-        width: 44px; /* Bigger button */
-        height: 44px; /* Bigger button */
-        background: rgba(255, 255, 255, 0.15); /* More visible background */
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        border-radius: 12px; /* Softer corners */
+        /* Positioned in the top-right reserved padding area */
+        top: 20px; 
+        right: 20px;
+        width: 44px; 
+        height: 44px;
+        /* Solid background color, not transparent */
+        background: #222222; 
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-radius: 12px;
         color: #fff; 
         font-weight: bold; 
-        font-size: 16px; /* Bigger icon */
+        font-size: 16px;
         line-height: 0;
         cursor: pointer; 
         display: flex; 
@@ -52,12 +54,14 @@
         justify-content: center;
         transition: all 0.2s ease;
         z-index: 101;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.5);
       }
       #btn-minimize:hover { 
         background: #ff4757; 
         border-color: #ff4757;
         color: white; 
         transform: scale(1.1);
+        box-shadow: 0 6px 12px rgba(0,0,0,0.6);
       }
 
       /* --- RESTORE BUTTON (Bottom of screen) --- */
@@ -72,7 +76,7 @@
 
       #btn-restore {
         background: rgba(0, 0, 0, 0.9); border: 1px solid rgba(0, 234, 255, 0.6);
-        color: #00eaff; padding: 15px 40px; /* Larger click area */
+        color: #00eaff; padding: 15px 40px;
         font-size: 16px; text-transform: uppercase;
         letter-spacing: 2px; cursor: pointer; border-radius: 40px; 
         backdrop-filter: blur(10px); box-shadow: 0 0 20px rgba(0, 234, 255, 0.4);
@@ -142,7 +146,7 @@
     </div>
 
     <div id="ui-container">
-      <!-- Minimize Icon (Now a Down Arrow and more visible) -->
+      <!-- Minimize Icon (Solid Background, Moved to Top Right) -->
       <button id="btn-minimize" onclick="toggleUIMinimize()" title="Minimize Menu">▼</button>
 
       <!-- Top Row: Modes -->
