@@ -4,138 +4,8 @@
     <meta charset="utf-8">
     <title>A-Frame Swarm: Generic World Hiding</title>
     <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
-    <style>
-      /* --- (UI STYLES REMAIN THE SAME) --- */
-      body { margin: 0; overflow: hidden; font-family: 'Segoe UI', sans-serif; user-select: none; }
-      #ui-container {
-        position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
-        z-index: 100; display: flex; flex-direction: column; align-items: center;
-        gap: 18px; background: rgba(0, 0, 0, 0.85); 
-        padding: 35px 80px 25px 35px; border-radius: 24px; backdrop-filter: blur(12px);
-        border: 1px solid rgba(255, 255, 255, 0.15); box-shadow: 0 10px 30px rgba(0,0,0,0.6); 
-        width: 1050px; max-width: 95vw; transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1);
-      }
-      #ui-container.minimized { transform: translateX(-50%) translateY(150%); opacity: 0; pointer-events: none; }
-      #btn-minimize {
-        position: absolute; top: 20px; right: 20px; width: 44px; height: 44px;
-        background: #222222; border: 2px solid rgba(255, 255, 255, 0.3); border-radius: 12px; 
-        color: #fff; font-weight: bold; font-size: 16px; cursor: pointer; display: flex; 
-        align-items: center; justify-content: center; transition: all 0.2s ease;
-      }
-      #btn-minimize:hover { background: #ff4757; border-color: #ff4757; transform: scale(1.1); }
-      #restore-container {
-        position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%) translateY(200%);
-        z-index: 99; transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1);
-      }
-      #restore-container.visible { transform: translateX(-50%) translateY(0); }
-      #btn-restore {
-        background: rgba(0, 0, 0, 0.9); border: 1px solid rgba(0, 234, 255, 0.6);
-        color: #00eaff; padding: 15px 40px; font-size: 16px; text-transform: uppercase;
-        letter-spacing: 2px; cursor: pointer; border-radius: 40px; backdrop-filter: blur(10px);
-        font-weight: 800; transition: all 0.2s;
-      }
-      #btn-restore:hover { background: rgba(0, 234, 255, 0.2); transform: scale(1.05); color: #fff; }
-      #btn-row { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; width: 100%; }
-      button.control-btn {
-        background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.2);
-        color: #ddd; padding: 12px 24px; font-size: 14px; text-transform: uppercase;
-        letter-spacing: 1px; cursor: pointer; border-radius: 12px; transition: all 0.2s ease;
-        outline: none; font-weight: 700; flex: 1;
-      }
-      button.control-btn:hover { background: rgba(255, 255, 255, 0.2); transform: translateY(-2px); }
-      button#btn-attack.active { background: #ff4757; border-color: #ff4757; }
-      button#btn-pressure.active { background: #ffa502; border-color: #ffa502; }
-      button#btn-push.active { background: #bdc3c7; border-color: #bdc3c7; color: #333; }
-      button#btn-chill.active { background: #2ed573; border-color: #2ed573; }
-      button#btn-audio.active { background: #00eaff; border-color: #00eaff; color: #000; }
-      button#btn-audio.muted { background: #ff0000; border-color: #ff0000; color: white; }
-      button.toggle-btn.active { background: #a29bfe; border-color: #a29bfe; }
-      button.toggle-btn.off { background: #2d3436; border-color: #636e72; color: #636e72; }
-      .dropdown-row { width: 100%; display: flex; gap: 20px; justify-content: space-between; }
-      .select-group { display: flex; flex-direction: column; gap: 6px; flex: 1; }
-      .select-group label { font-size: 11px; color: rgba(255,255,255,0.6); text-transform: uppercase; }
-      select {
-        background: rgba(0, 0, 0, 0.6); border: 1px solid rgba(255, 255, 255, 0.3);
-        color: #00eaff; padding: 10px 14px; border-radius: 8px; cursor: pointer; width: 100%;
-      }
-      .slider-row { width: 100%; display: flex; flex-direction: row; gap: 30px; align-items: flex-end; }
-      .slider-container { display: flex; flex-direction: column; gap: 10px; flex: 1; color: rgba(255,255,255,0.9); font-size: 12px; text-transform: uppercase; font-weight: 600; }
-      .label-row { display: flex; justify-content: space-between; width: 100%; }
-      .val-display { color: #00eaff; font-family: monospace; font-size: 13px; }
-      input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; }
-      input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 16px; width: 16px; border-radius: 50%; background: #ffffff; cursor: pointer; margin-top: -6px; }
-      input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; cursor: pointer; background: rgba(255,255,255,0.2); }
-      #audio-debug { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.7); color: #0f0; font-family: monospace; font-size: 11px; padding: 8px; border-radius: 4px; display: none; }
-    </style>
   </head>
-  <body>
-
-    <div id="audio-debug">Density: <span id="pressure-load">0%</span></div>
-
-    <!-- RESTORE BUTTON -->
-    <div id="restore-container">
-        <button id="btn-restore" onclick="toggleUIMinimize()">▲ Open Controls</button>
-    </div>
-
-    <!-- MAIN UI -->
-    <div id="ui-container">
-      <button id="btn-minimize" onclick="toggleUIMinimize()" title="Minimize Menu">▼</button>
-
-      <div id="btn-row">
-        <button id="btn-attack" class="control-btn" onclick="setMode('attack')">Attack</button>
-        <button id="btn-pressure" class="control-btn" onclick="setMode('pressure')">Pressure</button>
-        <button id="btn-push" class="control-btn" onclick="setMode('pushback')">Push Back</button>
-        <button id="btn-chill" class="control-btn active" onclick="setMode('chill')">Chill</button>
-      </div>
-
-      <div class="dropdown-row">
-        <div class="select-group">
-          <label>Scale (Chill Mode)</label>
-          <select id="scaleSelect" onchange="changeScale(this.value)">
-            <option value="pentatonic" selected>🌿 Pentatonic (Nature)</option>
-            <option value="insen">🧘‍♂️ Japanese In Sen (Zen)</option>
-            <option value="hirajoshi">🌙 Hirajoshi (Reflective)</option>
-            <option value="dorian">🔮 Dorian Mode (Introspective)</option>
-            <option value="wholetone">🌬️ Whole Tone (Dreamy)</option>
-          </select>
-        </div>
-        <div class="select-group">
-          <label>Instrument</label>
-          <select id="instSelect" onchange="changeInstrument(this.value)">
-            <option value="bowl">🔔 Singing Bowl</option>
-            <option value="bell">🎐 Soft Bell / Chime</option>
-            <option value="shakuhachi" selected>🍃 Shakuhachi</option>
-            <option value="kalimba">🪕 Kalimba</option>
-            <option value="organ">🎶 Soft Organ</option>
-          </select>
-        </div>
-      </div>
-      
-      <div class="slider-row">
-        <div class="slider-container">
-          <div class="label-row"><span>Swarm Force</span><span id="val-force" class="val-display">0.10</span></div>
-          <input type="range" id="intensitySlider" min="0.01" max="1.5" step="0.01" value="0.1">
-        </div>
-        <div class="slider-container">
-            <div class="label-row"><span>Master Vol</span><span id="val-vol" class="val-display">50%</span></div>
-            <input type="range" id="volumeSlider" min="0.0" max="1.0" step="0.05" value="0.50">
-        </div>
-        <div style="display: flex; gap: 10px; flex: 1.5; align-items: flex-end;">
-            <button id="btn-audio" class="control-btn active" onclick="toggleAudio()" style="height: 46px; min-width: 60px; font-size: 11px;">SND ON</button>
-            <button id="btn-sphere" class="control-btn toggle-btn active" onclick="toggleSafeSphere()" style="height: 46px; min-width: 70px; font-size: 11px;">SHIELD: VIS</button>
-            <button id="btn-system" class="control-btn toggle-btn active" onclick="toggleSystem()" style="height: 46px; min-width: 70px; font-size: 11px;">SYSTEM: ON</button>
-        </div>
-      </div>
-      
-      <div style="width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 15px; margin-top: 5px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1);">
-        <button class="control-btn" onclick="changeFence(-1)" style="padding: 8px 16px; flex: 0 0 auto;">◀ Prev Fence</button>
-        <div style="flex: 1; text-align: center; color: rgba(255,255,255,0.9); font-size: 12px; text-transform: uppercase; font-weight: 600;">
-          <div id="fence-name" style="color: #00eaff; font-size: 14px; margin-bottom: 3px;">Simple Wire</div>
-          <div id="fence-id" style="color: rgba(255,255,255,0.5); font-size: 10px;">Design 1/7</div>
-        </div>
-        <button class="control-btn" onclick="changeFence(1)" style="padding: 8px 16px; flex: 0 0 auto;">Next Fence ▶</button>
-      </div>
-    </div>
+  <body style="margin: 0; overflow: hidden; font-family: 'Segoe UI', sans-serif; user-select: none;">
 
     <!-- SCENE -->
     <a-scene stats background="color: #000000" renderer="antialias: true; colorManagement: true; sortObjects: true;" xr-mode-ui="XRMode:xr">
@@ -173,7 +43,8 @@
                   swarm_force: 0.1;
                   master_vol: 0.5;
                 "
-                position="0 0 0">
+                position="5 0 -3"
+                >
       </a-entity>
 
       <a-entity id="rig" movement-controls position="0.5 0 0">
@@ -185,6 +56,232 @@
     </a-scene>
 
     <script>
+      // ============================================
+      // CREATE UI DYNAMICALLY
+      // ============================================
+      function createUI() {
+        // Audio Debug
+        const audioDebug = document.createElement('div');
+        audioDebug.id = 'audio-debug';
+        audioDebug.style.cssText = 'position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.7); color: #0f0; font-family: monospace; font-size: 11px; padding: 8px; border-radius: 4px; display: none;';
+        audioDebug.innerHTML = 'Density: <span id="pressure-load">0%</span>';
+        document.body.appendChild(audioDebug);
+
+        // Restore Container
+        const restoreContainer = document.createElement('div');
+        restoreContainer.id = 'restore-container';
+        restoreContainer.style.cssText = 'position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%) translateY(200%); z-index: 99; transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1);';
+        const restoreBtn = document.createElement('button');
+        restoreBtn.id = 'btn-restore';
+        restoreBtn.style.cssText = 'background: rgba(0, 0, 0, 0.9); border: 1px solid rgba(0, 234, 255, 0.6); color: #00eaff; padding: 15px 40px; font-size: 16px; text-transform: uppercase; letter-spacing: 2px; cursor: pointer; border-radius: 40px; backdrop-filter: blur(10px); font-weight: 800; transition: all 0.2s;';
+        restoreBtn.textContent = '▲ Open Controls';
+        restoreBtn.onclick = toggleUIMinimize;
+        restoreBtn.onmouseenter = function() { this.style.background = 'rgba(0, 234, 255, 0.2)'; this.style.transform = 'scale(1.05)'; this.style.color = '#fff'; };
+        restoreBtn.onmouseleave = function() { this.style.background = 'rgba(0, 0, 0, 0.9)'; this.style.transform = 'scale(1)'; this.style.color = '#00eaff'; };
+        restoreContainer.appendChild(restoreBtn);
+        document.body.appendChild(restoreContainer);
+
+        // Main UI Container
+        const uiContainer = document.createElement('div');
+        uiContainer.id = 'ui-container';
+        uiContainer.style.cssText = 'position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 100; display: flex; flex-direction: column; align-items: center; gap: 18px; background: rgba(0, 0, 0, 0.85); padding: 35px 80px 25px 35px; border-radius: 24px; backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.15); box-shadow: 0 10px 30px rgba(0,0,0,0.6); width: 1050px; max-width: 95vw; transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1);';
+
+        // Minimize Button
+        const minimizeBtn = document.createElement('button');
+        minimizeBtn.id = 'btn-minimize';
+        minimizeBtn.style.cssText = 'position: absolute; top: 20px; right: 20px; width: 44px; height: 44px; background: #222222; border: 2px solid rgba(255, 255, 255, 0.3); border-radius: 12px; color: #fff; font-weight: bold; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease;';
+        minimizeBtn.title = 'Minimize Menu';
+        minimizeBtn.textContent = '▼';
+        minimizeBtn.onclick = toggleUIMinimize;
+        minimizeBtn.onmouseenter = function() { this.style.background = '#ff4757'; this.style.borderColor = '#ff4757'; this.style.transform = 'scale(1.1)'; };
+        minimizeBtn.onmouseleave = function() { this.style.background = '#222222'; this.style.borderColor = 'rgba(255, 255, 255, 0.3)'; this.style.transform = 'scale(1)'; };
+        uiContainer.appendChild(minimizeBtn);
+
+        // Button Row
+        const btnRow = document.createElement('div');
+        btnRow.id = 'btn-row';
+        btnRow.style.cssText = 'display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; width: 100%;';
+        const modes = [
+          { id: 'btn-attack', text: 'Attack', mode: 'attack' },
+          { id: 'btn-pressure', text: 'Pressure', mode: 'pressure' },
+          { id: 'btn-push', text: 'Push Back', mode: 'pushback' },
+          { id: 'btn-chill', text: 'Chill', mode: 'chill', active: true }
+        ];
+        modes.forEach(m => {
+          const btn = document.createElement('button');
+          btn.id = m.id;
+          btn.className = 'control-btn' + (m.active ? ' active' : '');
+          btn.style.cssText = 'background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.2); color: #ddd; padding: 12px 24px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; border-radius: 12px; transition: all 0.2s ease; outline: none; font-weight: 700; flex: 1;';
+          btn.textContent = m.text;
+          btn.onclick = () => setMode(m.mode);
+          btn.onmouseenter = function() { this.style.background = 'rgba(255, 255, 255, 0.2)'; this.style.transform = 'translateY(-2px)'; };
+          btn.onmouseleave = function() { if(!this.classList.contains('active')) this.style.background = 'rgba(255, 255, 255, 0.05)'; this.style.transform = 'translateY(0)'; };
+          btnRow.appendChild(btn);
+        });
+        uiContainer.appendChild(btnRow);
+
+        // Dropdown Row
+        const dropdownRow = document.createElement('div');
+        dropdownRow.className = 'dropdown-row';
+        dropdownRow.style.cssText = 'width: 100%; display: flex; gap: 20px; justify-content: space-between;';
+        
+        // Scale Select
+        const scaleGroup = document.createElement('div');
+        scaleGroup.className = 'select-group';
+        scaleGroup.style.cssText = 'display: flex; flex-direction: column; gap: 6px; flex: 1;';
+        const scaleLabel = document.createElement('label');
+        scaleLabel.style.cssText = 'font-size: 11px; color: rgba(255,255,255,0.6); text-transform: uppercase;';
+        scaleLabel.textContent = 'Scale (Chill Mode)';
+        const scaleSelect = document.createElement('select');
+        scaleSelect.id = 'scaleSelect';
+        scaleSelect.style.cssText = 'background: rgba(0, 0, 0, 0.6); border: 1px solid rgba(255, 255, 255, 0.3); color: #00eaff; padding: 10px 14px; border-radius: 8px; cursor: pointer; width: 100%;';
+        scaleSelect.onchange = (e) => changeScale(e.target.value);
+        ['pentatonic|🌿 Pentatonic (Nature)|1', 'insen|🧘‍♂️ Japanese In Sen (Zen)|0', 'hirajoshi|🌙 Hirajoshi (Reflective)|0', 'dorian|🔮 Dorian Mode (Introspective)|0', 'wholetone|🌬️ Whole Tone (Dreamy)|0'].forEach(opt => {
+          const [val, txt, sel] = opt.split('|');
+          const option = document.createElement('option');
+          option.value = val;
+          option.textContent = txt;
+          if(sel === '1') option.selected = true;
+          scaleSelect.appendChild(option);
+        });
+        scaleGroup.appendChild(scaleLabel);
+        scaleGroup.appendChild(scaleSelect);
+        dropdownRow.appendChild(scaleGroup);
+
+        // Instrument Select
+        const instGroup = document.createElement('div');
+        instGroup.className = 'select-group';
+        instGroup.style.cssText = 'display: flex; flex-direction: column; gap: 6px; flex: 1;';
+        const instLabel = document.createElement('label');
+        instLabel.style.cssText = 'font-size: 11px; color: rgba(255,255,255,0.6); text-transform: uppercase;';
+        instLabel.textContent = 'Instrument';
+        const instSelect = document.createElement('select');
+        instSelect.id = 'instSelect';
+        instSelect.style.cssText = 'background: rgba(0, 0, 0, 0.6); border: 1px solid rgba(255, 255, 255, 0.3); color: #00eaff; padding: 10px 14px; border-radius: 8px; cursor: pointer; width: 100%;';
+        instSelect.onchange = (e) => changeInstrument(e.target.value);
+        ['bowl|🔔 Singing Bowl|0', 'bell|🎐 Soft Bell / Chime|0', 'shakuhachi|🍃 Shakuhachi|1', 'kalimba|🪕 Kalimba|0', 'organ|🎶 Soft Organ|0'].forEach(opt => {
+          const [val, txt, sel] = opt.split('|');
+          const option = document.createElement('option');
+          option.value = val;
+          option.textContent = txt;
+          if(sel === '1') option.selected = true;
+          instSelect.appendChild(option);
+        });
+        instGroup.appendChild(instLabel);
+        instGroup.appendChild(instSelect);
+        dropdownRow.appendChild(instGroup);
+        uiContainer.appendChild(dropdownRow);
+
+        // Slider Row
+        const sliderRow = document.createElement('div');
+        sliderRow.className = 'slider-row';
+        sliderRow.style.cssText = 'width: 100%; display: flex; flex-direction: row; gap: 30px; align-items: flex-end;';
+
+        // Swarm Force Slider
+        const forceContainer = document.createElement('div');
+        forceContainer.className = 'slider-container';
+        forceContainer.style.cssText = 'display: flex; flex-direction: column; gap: 10px; flex: 1; color: rgba(255,255,255,0.9); font-size: 12px; text-transform: uppercase; font-weight: 600;';
+        const forceLabelRow = document.createElement('div');
+        forceLabelRow.className = 'label-row';
+        forceLabelRow.style.cssText = 'display: flex; justify-content: space-between; width: 100%;';
+        forceLabelRow.innerHTML = '<span>Swarm Force</span><span id="val-force" style="color: #00eaff; font-family: monospace; font-size: 13px;">0.10</span>';
+        const forceSlider = document.createElement('input');
+        forceSlider.type = 'range';
+        forceSlider.id = 'intensitySlider';
+        forceSlider.min = '0.01';
+        forceSlider.max = '1.5';
+        forceSlider.step = '0.01';
+        forceSlider.value = '0.1';
+        forceSlider.style.cssText = '-webkit-appearance: none; width: 100%; background: transparent;';
+        forceContainer.appendChild(forceLabelRow);
+        forceContainer.appendChild(forceSlider);
+        sliderRow.appendChild(forceContainer);
+
+        // Volume Slider
+        const volContainer = document.createElement('div');
+        volContainer.className = 'slider-container';
+        volContainer.style.cssText = 'display: flex; flex-direction: column; gap: 10px; flex: 1; color: rgba(255,255,255,0.9); font-size: 12px; text-transform: uppercase; font-weight: 600;';
+        const volLabelRow = document.createElement('div');
+        volLabelRow.className = 'label-row';
+        volLabelRow.style.cssText = 'display: flex; justify-content: space-between; width: 100%;';
+        volLabelRow.innerHTML = '<span>Master Vol</span><span id="val-vol" style="color: #00eaff; font-family: monospace; font-size: 13px;">50%</span>';
+        const volSlider = document.createElement('input');
+        volSlider.type = 'range';
+        volSlider.id = 'volumeSlider';
+        volSlider.min = '0.0';
+        volSlider.max = '1.0';
+        volSlider.step = '0.05';
+        volSlider.value = '0.50';
+        volSlider.style.cssText = '-webkit-appearance: none; width: 100%; background: transparent;';
+        volContainer.appendChild(volLabelRow);
+        volContainer.appendChild(volSlider);
+        sliderRow.appendChild(volContainer);
+
+        // Toggle Buttons Container
+        const toggleContainer = document.createElement('div');
+        toggleContainer.style.cssText = 'display: flex; gap: 10px; flex: 1.5; align-items: flex-end;';
+        const toggles = [
+          { id: 'btn-audio', text: 'SND ON', active: true, click: toggleAudio, cls: 'active' },
+          { id: 'btn-sphere', text: 'SHIELD: VIS', active: true, click: toggleSafeSphere, cls: 'toggle-btn active' },
+          { id: 'btn-system', text: 'SYSTEM: ON', active: true, click: toggleSystem, cls: 'toggle-btn active' }
+        ];
+        toggles.forEach(t => {
+          const btn = document.createElement('button');
+          btn.id = t.id;
+          btn.className = 'control-btn ' + t.cls;
+          btn.style.cssText = 'background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.2); color: #ddd; padding: 12px 24px; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; border-radius: 12px; transition: all 0.2s ease; outline: none; font-weight: 700; height: 46px; min-width: 60px;';
+          btn.textContent = t.text;
+          btn.onclick = t.click;
+          toggleContainer.appendChild(btn);
+        });
+        sliderRow.appendChild(toggleContainer);
+        uiContainer.appendChild(sliderRow);
+
+        // Fence Controls Row
+        const fenceRow = document.createElement('div');
+        fenceRow.style.cssText = 'width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 15px; margin-top: 5px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1);';
+        const prevBtn = document.createElement('button');
+        prevBtn.className = 'control-btn';
+        prevBtn.style.cssText = 'background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.2); color: #ddd; padding: 8px 16px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; border-radius: 12px; transition: all 0.2s ease; outline: none; font-weight: 700; flex: 0 0 auto;';
+        prevBtn.textContent = '◀ Prev Fence';
+        prevBtn.onclick = () => changeFence(-1);
+        const fenceInfo = document.createElement('div');
+        fenceInfo.style.cssText = 'flex: 1; text-align: center; color: rgba(255,255,255,0.9); font-size: 12px; text-transform: uppercase; font-weight: 600;';
+        fenceInfo.innerHTML = '<div id="fence-name" style="color: #00eaff; font-size: 14px; margin-bottom: 3px;">Simple Wire</div><div id="fence-id" style="color: rgba(255,255,255,0.5); font-size: 10px;">Design 1/7</div>';
+        const nextBtn = document.createElement('button');
+        nextBtn.className = 'control-btn';
+        nextBtn.style.cssText = 'background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.2); color: #ddd; padding: 8px 16px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; border-radius: 12px; transition: all 0.2s ease; outline: none; font-weight: 700; flex: 0 0 auto;';
+        nextBtn.textContent = 'Next Fence ▶';
+        nextBtn.onclick = () => changeFence(1);
+        fenceRow.appendChild(prevBtn);
+        fenceRow.appendChild(fenceInfo);
+        fenceRow.appendChild(nextBtn);
+        uiContainer.appendChild(fenceRow);
+
+        document.body.appendChild(uiContainer);
+
+        // Add CSS for range sliders
+        const style = document.createElement('style');
+        style.textContent = `
+          input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 16px; width: 16px; border-radius: 50%; background: #ffffff; cursor: pointer; margin-top: -6px; }
+          input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; cursor: pointer; background: rgba(255,255,255,0.2); }
+          #ui-container.minimized { transform: translateX(-50%) translateY(150%) !important; opacity: 0 !important; pointer-events: none !important; }
+          #restore-container.visible { transform: translateX(-50%) translateY(0) !important; }
+          button#btn-attack.active { background: #ff4757 !important; border-color: #ff4757 !important; }
+          button#btn-pressure.active { background: #ffa502 !important; border-color: #ffa502 !important; }
+          button#btn-push.active { background: #bdc3c7 !important; border-color: #bdc3c7 !important; color: #333 !important; }
+          button#btn-chill.active { background: #2ed573 !important; border-color: #2ed573 !important; }
+          button#btn-audio.active { background: #00eaff !important; border-color: #00eaff !important; color: #000 !important; }
+          button#btn-audio.muted { background: #ff0000 !important; border-color: #ff0000 !important; color: white !important; }
+          button.toggle-btn.active { background: #a29bfe !important; border-color: #a29bfe !important; }
+          button.toggle-btn.off { background: #2d3436 !important; border-color: #636e72 !important; color: #636e72 !important; }
+        `;
+        document.head.appendChild(style);
+      }
+
+      // ============================================
+      // UI FUNCTIONS
+      // ============================================
       let uiMinimized = false;
       function toggleUIMinimize() {
           uiMinimized = !uiMinimized;
@@ -320,7 +417,12 @@
         activate: function(pos, normal, color) {
           this.isActive = true; this.timer = 0; this.lifeTime = 400 + Math.random() * 600; 
           this.el.object3D.position.copy(pos).addScaledVector(normal, 0.02);
-          this.el.object3D.lookAt(new THREE.Vector3().copy(pos).add(normal));
+          // Convert local normal direction to world space for proper lookAt
+          const worldPos = new THREE.Vector3();
+          const worldNormal = new THREE.Vector3();
+          this.el.object3D.getWorldPosition(worldPos);
+          worldNormal.copy(normal).applyQuaternion(this.el.object3D.parent.quaternion);
+          this.el.object3D.lookAt(worldPos.clone().add(worldNormal));
           this.el.object3D.visible = true; const mesh = this.el.getObject3D('mesh'); if (mesh) { mesh.material.opacity = 1.0; mesh.material.color.set(color); }
         },
         tick: function(t, dt) {
@@ -363,6 +465,11 @@
           // ------------------------------
 
           this.balls = []; this.fenceObjects = []; this.currentFenceIndex = 0; this.soundEngine = null;
+          
+          // Create a container for the box that will be positioned at entity's location
+          this.boxContainer = document.createElement('a-entity');
+          this.el.appendChild(this.boxContainer);
+          
           this.createVisualStructure(); this.createPool(); this.createFenceDesigns(); this.set_fence_style('Simple Wire'); 
           this.vTemp = new THREE.Vector3(); this.vDir = new THREE.Vector3(); this.vNormal = new THREE.Vector3();
           this.pressureBucketCurrent = 0; this.pressureBucketPrevious = 0; this.pressureTimer = 0;
@@ -380,7 +487,9 @@
 
         // ... (Functions createVisualStructure, createPool, createBalls, removeBalls, activate_*, set_*, mute, unmute remain the same) ...
         createVisualStructure: function() {
-          this.sphereContainer = document.createElement('a-entity'); this.el.appendChild(this.sphereContainer);
+          this.sphereContainer = document.createElement('a-entity'); 
+          // Add sphere to boxContainer instead of directly to this.el, with position 0,0,0 (center of box)
+          this.boxContainer.appendChild(this.sphereContainer);
           this.safeCore = document.createElement('a-sphere'); this.safeCore.setAttribute('radius', '1'); this.safeCore.setAttribute('segments-width', 64); this.safeCore.setAttribute('segments-height', 64);
           this.safeCore.setAttribute('material', 'color: #00a8ff; opacity: 0.12; transparent: true; roughness: 0.1; metalness: 0.0; side: double; blending: additive; depthWrite: false');
           this.sphereContainer.appendChild(this.safeCore);
@@ -389,7 +498,7 @@
           this.sphereContainer.appendChild(this.safeWire);
           this.sphereContainer.object3D.scale.set(this.targetRadius, this.targetRadius, this.targetRadius);
         },
-        createPool: function() { this.ringPool = []; this.poolIndex = 0; const poolContainer = document.createElement('a-entity'); this.el.appendChild(poolContainer); for(let i=0; i<50; i++) { let el = document.createElement('a-entity'); el.setAttribute('pooled-ring', ''); poolContainer.appendChild(el); this.ringPool.push(el); } },
+        createPool: function() { this.ringPool = []; this.poolIndex = 0; const poolContainer = document.createElement('a-entity'); this.boxContainer.appendChild(poolContainer); for(let i=0; i<50; i++) { let el = document.createElement('a-entity'); el.setAttribute('pooled-ring', ''); poolContainer.appendChild(el); this.ringPool.push(el); } },
         createBalls: function() {
           if(this.balls.length > 0) return; const bound = this.data.box_size / 2;
           for(let i=0; i<this.data.number_of_balls; i++) {
@@ -401,7 +510,7 @@
             ball.object3D.position.copy(pos);
             const palette = this.palettes[this.mode] || this.palettes.chill; const col = palette[Math.floor(Math.random() * palette.length)];
             ball.userData = { velocity: new THREE.Vector3(0,0,0), colorTarget: new THREE.Color(col), currentColor: new THREE.Color(col), isAttacking: false, attackCooldown: 0, lastImpactTime: 0, radius: r };
-            this.el.sceneEl.appendChild(ball); this.balls.push(ball);
+            this.boxContainer.appendChild(ball); this.balls.push(ball);
           }
         },
         removeBalls: function() { this.balls.forEach(ball => { if(ball.parentNode) ball.parentNode.removeChild(ball); }); this.balls = []; },
@@ -429,12 +538,14 @@
           const cam = this.el.sceneEl.camera;
           if (cam) {
             cam.el.object3D.getWorldPosition(this.camWorldPos);
-            const sphereWorldPos = this.el.object3D.position; 
+            // Get the world position of the box container (where the entity is positioned)
+            const boxWorldPos = new THREE.Vector3();
+            this.boxContainer.object3D.getWorldPosition(boxWorldPos);
             const limit = this.data.box_size / 2;
             const isInside = (
-              Math.abs(this.camWorldPos.x - sphereWorldPos.x) < limit &&
-              Math.abs(this.camWorldPos.y - sphereWorldPos.y) < limit &&
-              Math.abs(this.camWorldPos.z - sphereWorldPos.z) < limit
+              Math.abs(this.camWorldPos.x - boxWorldPos.x) < limit &&
+              Math.abs(this.camWorldPos.y - boxWorldPos.y) < limit &&
+              Math.abs(this.camWorldPos.z - boxWorldPos.z) < limit
             );
 
             if (isInside !== this.boxContainsCamera) {
@@ -508,7 +619,14 @@
           if (this.mode !== 'attack') { this.handleBallCollisions(); }
         },
         applyJitter: function(vel, force) { vel.x += (Math.random() * 2 - 1) * force; vel.y += (Math.random() * 2 - 1) * force; vel.z += (Math.random() * 2 - 1) * force; },
-        spawnRing: function(pos, normal, color) { let poolEl = this.ringPool[this.poolIndex]; this.poolIndex = (this.poolIndex + 1) % this.ringPool.length; if (poolEl.components['pooled-ring']) poolEl.components['pooled-ring'].activate(pos, normal, color); },
+        spawnRing: function(pos, normal, color) { 
+          // Calculate the actual position on the sphere surface
+          const sphereRadius = this.sphereContainer.object3D.scale.x;
+          const ringPos = new THREE.Vector3().copy(normal).multiplyScalar(sphereRadius);
+          let poolEl = this.ringPool[this.poolIndex]; 
+          this.poolIndex = (this.poolIndex + 1) % this.ringPool.length; 
+          if (poolEl.components['pooled-ring']) poolEl.components['pooled-ring'].activate(ringPos, normal, color); 
+        },
         handleBallCollisions: function() {
            const rSum = this.data.balls_radius_max * 1.5; const rSumSq = rSum * rSum;
            for (let i = 0; i < this.balls.length; i++) {
@@ -548,7 +666,6 @@
 
       
       let currentFenceIndex = 0; const fenceNames = FENCE_DESIGNS.map(d => d.name);
-      const intensitySlider = document.getElementById('intensitySlider'); const volumeSlider = document.getElementById('volumeSlider');
       function getSphereComp() { const el = document.getElementById('main-safe-sphere'); return el ? el.components['safe-sphere'] : null; }
       function setMode(mode) {
         const comp = getSphereComp(); if (!comp || !comp.isSystemActive) return; 
@@ -558,8 +675,6 @@
       }
       function changeScale(val) { const comp = getSphereComp(); if(comp) comp.set_scale(val); }
       function changeInstrument(val) { const comp = getSphereComp(); if(comp) comp.set_instrument(val); }
-      intensitySlider.addEventListener('input', (e) => { const val = parseFloat(e.target.value); document.getElementById('val-force').innerText = val.toFixed(2); const comp = getSphereComp(); if(comp) comp.set_swarm_force(val); });
-      volumeSlider.addEventListener('input', (e) => { const val = parseFloat(e.target.value); document.getElementById('val-vol').innerText = Math.round(val * 100) + '%'; const comp = getSphereComp(); if(comp) comp.set_master_vol(val); });
       function changeFence(direction) { currentFenceIndex = (currentFenceIndex + direction + fenceNames.length) % fenceNames.length; const name = fenceNames[currentFenceIndex]; document.getElementById('fence-name').innerText = name; document.getElementById('fence-id').innerText = `Design ${currentFenceIndex + 1}/7`; const comp = getSphereComp(); if(comp) comp.set_fence_style(name); }
       let isAudioEnabled = true;
       function toggleAudio() { isAudioEnabled = !isAudioEnabled; const btn = document.getElementById('btn-audio'); const comp = getSphereComp(); if(isAudioEnabled) { btn.classList.remove('muted'); btn.classList.add('active'); btn.innerText = "SND ON"; if(comp) comp.unmute(); } else { btn.classList.remove('active'); btn.classList.add('muted'); btn.innerText = "MUTED"; if(comp) comp.mute(); } }
@@ -567,6 +682,18 @@
       function toggleSystem() { isSystemEnabled = !isSystemEnabled; const btn = document.getElementById('btn-system'); const comp = getSphereComp(); if(isSystemEnabled) { btn.classList.remove('off'); btn.classList.add('active'); btn.innerText = "SYSTEM: ON"; if(comp) comp.show_all(); } else { btn.classList.remove('active'); btn.classList.add('off'); btn.innerText = "SYSTEM: OFF"; if(comp) comp.hide_all(); } }
       let isSphereVisEnabled = true;
       function toggleSafeSphere() { isSphereVisEnabled = !isSphereVisEnabled; const btn = document.getElementById('btn-sphere'); const comp = getSphereComp(); if(isSphereVisEnabled) { btn.classList.remove('off'); btn.classList.add('active'); btn.innerText = "SHIELD: VIS"; if(comp) comp.show_safe_sphere(); } else { btn.classList.remove('active'); btn.classList.add('off'); btn.innerText = "SHIELD: HID"; if(comp) comp.hide_safe_sphere(); } }
+
+      // ============================================
+      // INITIALIZE EVERYTHING
+      // ============================================
+      document.addEventListener('DOMContentLoaded', function() {
+        createUI();
+        
+        const intensitySlider = document.getElementById('intensitySlider');
+        const volumeSlider = document.getElementById('volumeSlider');
+        intensitySlider.addEventListener('input', (e) => { const val = parseFloat(e.target.value); document.getElementById('val-force').innerText = val.toFixed(2); const comp = getSphereComp(); if(comp) comp.set_swarm_force(val); });
+        volumeSlider.addEventListener('input', (e) => { const val = parseFloat(e.target.value); document.getElementById('val-vol').innerText = Math.round(val * 100) + '%'; const comp = getSphereComp(); if(comp) comp.set_master_vol(val); });
+      });
     </script>
   </body>
 </html>
