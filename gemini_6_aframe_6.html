@@ -102,9 +102,9 @@
         <div class="select-group">
           <label>Instrument</label>
           <select id="instSelect" onchange="changeInstrument(this.value)">
-            <option value="bowl" selected>🔔 Singing Bowl</option>
+            <option value="bowl">🔔 Singing Bowl</option>
             <option value="bell">🎐 Soft Bell / Chime</option>
-            <option value="shakuhachi">🍃 Shakuhachi</option>
+            <option value="shakuhachi" selected>🍃 Shakuhachi</option>
             <option value="kalimba">🪕 Kalimba</option>
             <option value="organ">🎶 Soft Organ</option>
           </select>
@@ -200,7 +200,7 @@
           const AudioContext = window.AudioContext || window.webkitAudioContext;
           this.ctx = new AudioContext();
           this.maxVoices = 12; this.voicePool = []; this.lastTriggerTime = 0; this.minTimeBetweenTriggers = 15; 
-          this.currentVolumeSetting = volume; this.currentInstrument = 'bowl'; this.currentScaleName = 'pentatonic';
+          this.currentVolumeSetting = volume; this.currentInstrument = 'shakuhachi'; this.currentScaleName = 'pentatonic';
           this.masterGain = this.ctx.createGain(); this.masterGain.gain.value = volume;
           this.limiter = this.ctx.createDynamicsCompressor(); this.limiter.connect(this.masterGain); this.masterGain.connect(this.ctx.destination);
           this.convolver = this.ctx.createConvolver(); this.wetGain = this.ctx.createGain(); this.wetGain.gain.value = 0.35; 
