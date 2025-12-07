@@ -84,12 +84,12 @@
         // Main UI Container
         const uiContainer = document.createElement('div');
         uiContainer.id = 'ui-container';
-        uiContainer.style.cssText = 'position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 100; display: flex; flex-direction: column; align-items: center; gap: 18px; background: rgba(0, 0, 0, 0.85); padding: 35px 80px 25px 35px; border-radius: 24px; backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.15); box-shadow: 0 10px 30px rgba(0,0,0,0.6); width: 1050px; max-width: 95vw; transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1);';
+        uiContainer.style.cssText = 'position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 100; display: flex; flex-direction: column; gap: 12px; background: rgba(0, 0, 0, 0.85); padding: 20px; border-radius: 16px; backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.15); box-shadow: 0 10px 30px rgba(0,0,0,0.6); width: 500px; height: 500px; transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1);';
 
         // Minimize Button
         const minimizeBtn = document.createElement('button');
         minimizeBtn.id = 'btn-minimize';
-        minimizeBtn.style.cssText = 'position: absolute; top: 20px; right: 20px; width: 44px; height: 44px; background: #222222; border: 2px solid rgba(255, 255, 255, 0.3); border-radius: 12px; color: #fff; font-weight: bold; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease;';
+        minimizeBtn.style.cssText = 'position: absolute; top: 10px; right: 10px; width: 32px; height: 32px; background: #222222; border: 2px solid rgba(255, 255, 255, 0.3); border-radius: 8px; color: #fff; font-weight: bold; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease;';
         minimizeBtn.title = 'Minimize Menu';
         minimizeBtn.textContent = '▼';
         minimizeBtn.onclick = toggleUIMinimize;
@@ -97,10 +97,29 @@
         minimizeBtn.onmouseleave = function() { this.style.background = '#222222'; this.style.borderColor = 'rgba(255, 255, 255, 0.3)'; this.style.transform = 'scale(1)'; };
         uiContainer.appendChild(minimizeBtn);
 
-        // Button Row
+        // Row 1: Toggle Buttons (Show/Hide/Mute)
+        const toggleRow = document.createElement('div');
+        toggleRow.style.cssText = 'display: flex; gap: 8px; width: 100%;';
+        const toggles = [
+          { id: 'btn-audio', text: 'SND ON', active: true, click: toggleAudio, cls: 'active' },
+          { id: 'btn-sphere', text: 'SHIELD: VIS', active: true, click: toggleSafeSphere, cls: 'toggle-btn active' },
+          { id: 'btn-system', text: 'SYSTEM: ON', active: true, click: toggleSystem, cls: 'toggle-btn active' }
+        ];
+        toggles.forEach(t => {
+          const btn = document.createElement('button');
+          btn.id = t.id;
+          btn.className = 'control-btn ' + t.cls;
+          btn.style.cssText = 'background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.2); color: #ddd; padding: 10px 8px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; border-radius: 8px; transition: all 0.2s ease; outline: none; font-weight: 700; flex: 1;';
+          btn.textContent = t.text;
+          btn.onclick = t.click;
+          toggleRow.appendChild(btn);
+        });
+        uiContainer.appendChild(toggleRow);
+
+        // Row 2: Mode Buttons (Attack, Pressure, Push Back, Chill)
         const btnRow = document.createElement('div');
         btnRow.id = 'btn-row';
-        btnRow.style.cssText = 'display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; width: 100%;';
+        btnRow.style.cssText = 'display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%;';
         const modes = [
           { id: 'btn-attack', text: 'Attack', mode: 'attack' },
           { id: 'btn-pressure', text: 'Pressure', mode: 'pressure' },
@@ -111,7 +130,7 @@
           const btn = document.createElement('button');
           btn.id = m.id;
           btn.className = 'control-btn' + (m.active ? ' active' : '');
-          btn.style.cssText = 'background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.2); color: #ddd; padding: 12px 24px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; border-radius: 12px; transition: all 0.2s ease; outline: none; font-weight: 700; flex: 1;';
+          btn.style.cssText = 'background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.2); color: #ddd; padding: 20px 12px; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; border-radius: 10px; transition: all 0.2s ease; outline: none; font-weight: 700;';
           btn.textContent = m.text;
           btn.onclick = () => setMode(m.mode);
           btn.onmouseenter = function() { this.style.background = 'rgba(255, 255, 255, 0.2)'; this.style.transform = 'translateY(-2px)'; };
@@ -120,71 +139,19 @@
         });
         uiContainer.appendChild(btnRow);
 
-        // Dropdown Row
-        const dropdownRow = document.createElement('div');
-        dropdownRow.className = 'dropdown-row';
-        dropdownRow.style.cssText = 'width: 100%; display: flex; gap: 20px; justify-content: space-between;';
-        
-        // Scale Select
-        const scaleGroup = document.createElement('div');
-        scaleGroup.className = 'select-group';
-        scaleGroup.style.cssText = 'display: flex; flex-direction: column; gap: 6px; flex: 1;';
-        const scaleLabel = document.createElement('label');
-        scaleLabel.style.cssText = 'font-size: 11px; color: rgba(255,255,255,0.6); text-transform: uppercase;';
-        scaleLabel.textContent = 'Scale (Chill Mode)';
-        const scaleSelect = document.createElement('select');
-        scaleSelect.id = 'scaleSelect';
-        scaleSelect.style.cssText = 'background: rgba(0, 0, 0, 0.6); border: 1px solid rgba(255, 255, 255, 0.3); color: #00eaff; padding: 10px 14px; border-radius: 8px; cursor: pointer; width: 100%;';
-        scaleSelect.onchange = (e) => changeScale(e.target.value);
-        ['pentatonic|🌿 Pentatonic (Nature)|1', 'insen|🧘‍♂️ Japanese In Sen (Zen)|0', 'hirajoshi|🌙 Hirajoshi (Reflective)|0', 'dorian|🔮 Dorian Mode (Introspective)|0', 'wholetone|🌬️ Whole Tone (Dreamy)|0'].forEach(opt => {
-          const [val, txt, sel] = opt.split('|');
-          const option = document.createElement('option');
-          option.value = val;
-          option.textContent = txt;
-          if(sel === '1') option.selected = true;
-          scaleSelect.appendChild(option);
-        });
-        scaleGroup.appendChild(scaleLabel);
-        scaleGroup.appendChild(scaleSelect);
-        dropdownRow.appendChild(scaleGroup);
-
-        // Instrument Select
-        const instGroup = document.createElement('div');
-        instGroup.className = 'select-group';
-        instGroup.style.cssText = 'display: flex; flex-direction: column; gap: 6px; flex: 1;';
-        const instLabel = document.createElement('label');
-        instLabel.style.cssText = 'font-size: 11px; color: rgba(255,255,255,0.6); text-transform: uppercase;';
-        instLabel.textContent = 'Instrument';
-        const instSelect = document.createElement('select');
-        instSelect.id = 'instSelect';
-        instSelect.style.cssText = 'background: rgba(0, 0, 0, 0.6); border: 1px solid rgba(255, 255, 255, 0.3); color: #00eaff; padding: 10px 14px; border-radius: 8px; cursor: pointer; width: 100%;';
-        instSelect.onchange = (e) => changeInstrument(e.target.value);
-        ['bowl|🔔 Singing Bowl|0', 'bell|🎐 Soft Bell / Chime|0', 'shakuhachi|🍃 Shakuhachi|1', 'kalimba|🪕 Kalimba|0', 'organ|🎶 Soft Organ|0'].forEach(opt => {
-          const [val, txt, sel] = opt.split('|');
-          const option = document.createElement('option');
-          option.value = val;
-          option.textContent = txt;
-          if(sel === '1') option.selected = true;
-          instSelect.appendChild(option);
-        });
-        instGroup.appendChild(instLabel);
-        instGroup.appendChild(instSelect);
-        dropdownRow.appendChild(instGroup);
-        uiContainer.appendChild(dropdownRow);
-
-        // Slider Row
+        // Row 3: Sliders (Force and Volume)
         const sliderRow = document.createElement('div');
         sliderRow.className = 'slider-row';
-        sliderRow.style.cssText = 'width: 100%; display: flex; flex-direction: row; gap: 30px; align-items: flex-end;';
+        sliderRow.style.cssText = 'width: 100%; display: flex; flex-direction: column; gap: 15px;';
 
         // Swarm Force Slider
         const forceContainer = document.createElement('div');
         forceContainer.className = 'slider-container';
-        forceContainer.style.cssText = 'display: flex; flex-direction: column; gap: 10px; flex: 1; color: rgba(255,255,255,0.9); font-size: 12px; text-transform: uppercase; font-weight: 600;';
+        forceContainer.style.cssText = 'display: flex; flex-direction: column; gap: 8px; color: rgba(255,255,255,0.9); font-size: 11px; text-transform: uppercase; font-weight: 600;';
         const forceLabelRow = document.createElement('div');
         forceLabelRow.className = 'label-row';
         forceLabelRow.style.cssText = 'display: flex; justify-content: space-between; width: 100%;';
-        forceLabelRow.innerHTML = '<span>Swarm Force</span><span id="val-force" style="color: #00eaff; font-family: monospace; font-size: 13px;">0.10</span>';
+        forceLabelRow.innerHTML = '<span>Swarm Force</span><span id="val-force" style="color: #00eaff; font-family: monospace; font-size: 12px;">0.10</span>';
         const forceSlider = document.createElement('input');
         forceSlider.type = 'range';
         forceSlider.id = 'intensitySlider';
@@ -200,11 +167,11 @@
         // Volume Slider
         const volContainer = document.createElement('div');
         volContainer.className = 'slider-container';
-        volContainer.style.cssText = 'display: flex; flex-direction: column; gap: 10px; flex: 1; color: rgba(255,255,255,0.9); font-size: 12px; text-transform: uppercase; font-weight: 600;';
+        volContainer.style.cssText = 'display: flex; flex-direction: column; gap: 8px; color: rgba(255,255,255,0.9); font-size: 11px; text-transform: uppercase; font-weight: 600;';
         const volLabelRow = document.createElement('div');
         volLabelRow.className = 'label-row';
         volLabelRow.style.cssText = 'display: flex; justify-content: space-between; width: 100%;';
-        volLabelRow.innerHTML = '<span>Master Vol</span><span id="val-vol" style="color: #00eaff; font-family: monospace; font-size: 13px;">50%</span>';
+        volLabelRow.innerHTML = '<span>Master Vol</span><span id="val-vol" style="color: #00eaff; font-family: monospace; font-size: 12px;">50%</span>';
         const volSlider = document.createElement('input');
         volSlider.type = 'range';
         volSlider.id = 'volumeSlider';
@@ -216,42 +183,75 @@
         volContainer.appendChild(volLabelRow);
         volContainer.appendChild(volSlider);
         sliderRow.appendChild(volContainer);
-
-        // Toggle Buttons Container
-        const toggleContainer = document.createElement('div');
-        toggleContainer.style.cssText = 'display: flex; gap: 10px; flex: 1.5; align-items: flex-end;';
-        const toggles = [
-          { id: 'btn-audio', text: 'SND ON', active: true, click: toggleAudio, cls: 'active' },
-          { id: 'btn-sphere', text: 'SHIELD: VIS', active: true, click: toggleSafeSphere, cls: 'toggle-btn active' },
-          { id: 'btn-system', text: 'SYSTEM: ON', active: true, click: toggleSystem, cls: 'toggle-btn active' }
-        ];
-        toggles.forEach(t => {
-          const btn = document.createElement('button');
-          btn.id = t.id;
-          btn.className = 'control-btn ' + t.cls;
-          btn.style.cssText = 'background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.2); color: #ddd; padding: 12px 24px; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; border-radius: 12px; transition: all 0.2s ease; outline: none; font-weight: 700; height: 46px; min-width: 60px;';
-          btn.textContent = t.text;
-          btn.onclick = t.click;
-          toggleContainer.appendChild(btn);
-        });
-        sliderRow.appendChild(toggleContainer);
         uiContainer.appendChild(sliderRow);
 
-        // Fence Controls Row
+        // Row 4: Dropdown Row (Scale and Instrument in 2 columns)
+        const dropdownRow = document.createElement('div');
+        dropdownRow.className = 'dropdown-row';
+        dropdownRow.style.cssText = 'width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;';
+        
+        // Scale Select
+        const scaleGroup = document.createElement('div');
+        scaleGroup.className = 'select-group';
+        scaleGroup.style.cssText = 'display: flex; flex-direction: column; gap: 6px;';
+        const scaleLabel = document.createElement('label');
+        scaleLabel.style.cssText = 'font-size: 10px; color: rgba(255,255,255,0.6); text-transform: uppercase;';
+        scaleLabel.textContent = 'Scale';
+        const scaleSelect = document.createElement('select');
+        scaleSelect.id = 'scaleSelect';
+        scaleSelect.style.cssText = 'background: rgba(0, 0, 0, 0.6); border: 1px solid rgba(255, 255, 255, 0.3); color: #00eaff; padding: 8px 10px; border-radius: 6px; cursor: pointer; font-size: 11px;';
+        scaleSelect.onchange = (e) => changeScale(e.target.value);
+        ['pentatonic|Pentatonic|1', 'insen|In Sen|0', 'hirajoshi|Hirajoshi|0', 'dorian|Dorian|0', 'wholetone|Whole Tone|0'].forEach(opt => {
+          const [val, txt, sel] = opt.split('|');
+          const option = document.createElement('option');
+          option.value = val;
+          option.textContent = txt;
+          if(sel === '1') option.selected = true;
+          scaleSelect.appendChild(option);
+        });
+        scaleGroup.appendChild(scaleLabel);
+        scaleGroup.appendChild(scaleSelect);
+        dropdownRow.appendChild(scaleGroup);
+
+        // Instrument Select
+        const instGroup = document.createElement('div');
+        instGroup.className = 'select-group';
+        instGroup.style.cssText = 'display: flex; flex-direction: column; gap: 6px;';
+        const instLabel = document.createElement('label');
+        instLabel.style.cssText = 'font-size: 10px; color: rgba(255,255,255,0.6); text-transform: uppercase;';
+        instLabel.textContent = 'Instrument';
+        const instSelect = document.createElement('select');
+        instSelect.id = 'instSelect';
+        instSelect.style.cssText = 'background: rgba(0, 0, 0, 0.6); border: 1px solid rgba(255, 255, 255, 0.3); color: #00eaff; padding: 8px 10px; border-radius: 6px; cursor: pointer; font-size: 11px;';
+        instSelect.onchange = (e) => changeInstrument(e.target.value);
+        ['bowl|Singing Bowl|0', 'bell|Bell|0', 'shakuhachi|Shakuhachi|1', 'kalimba|Kalimba|0', 'organ|Organ|0'].forEach(opt => {
+          const [val, txt, sel] = opt.split('|');
+          const option = document.createElement('option');
+          option.value = val;
+          option.textContent = txt;
+          if(sel === '1') option.selected = true;
+          instSelect.appendChild(option);
+        });
+        instGroup.appendChild(instLabel);
+        instGroup.appendChild(instSelect);
+        dropdownRow.appendChild(instGroup);
+        uiContainer.appendChild(dropdownRow);
+
+        // Row 5: Fence Controls
         const fenceRow = document.createElement('div');
-        fenceRow.style.cssText = 'width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 15px; margin-top: 5px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1);';
+        fenceRow.style.cssText = 'width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: auto;';
         const prevBtn = document.createElement('button');
         prevBtn.className = 'control-btn';
-        prevBtn.style.cssText = 'background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.2); color: #ddd; padding: 8px 16px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; border-radius: 12px; transition: all 0.2s ease; outline: none; font-weight: 700; flex: 0 0 auto;';
-        prevBtn.textContent = '◀ Prev Fence';
+        prevBtn.style.cssText = 'background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.2); color: #ddd; padding: 8px 12px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; border-radius: 8px; transition: all 0.2s ease; outline: none; font-weight: 700; flex: 0 0 auto;';
+        prevBtn.textContent = '◀';
         prevBtn.onclick = () => changeFence(-1);
         const fenceInfo = document.createElement('div');
-        fenceInfo.style.cssText = 'flex: 1; text-align: center; color: rgba(255,255,255,0.9); font-size: 12px; text-transform: uppercase; font-weight: 600;';
-        fenceInfo.innerHTML = '<div id="fence-name" style="color: #00eaff; font-size: 14px; margin-bottom: 3px;">Simple Wire</div><div id="fence-id" style="color: rgba(255,255,255,0.5); font-size: 10px;">Design 1/7</div>';
+        fenceInfo.style.cssText = 'flex: 1; text-align: center; color: rgba(255,255,255,0.9); font-size: 11px; text-transform: uppercase; font-weight: 600;';
+        fenceInfo.innerHTML = '<div id="fence-name" style="color: #00eaff; font-size: 12px; margin-bottom: 2px;">Simple Wire</div><div id="fence-id" style="color: rgba(255,255,255,0.5); font-size: 9px;">Design 1/7</div>';
         const nextBtn = document.createElement('button');
         nextBtn.className = 'control-btn';
-        nextBtn.style.cssText = 'background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.2); color: #ddd; padding: 8px 16px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; border-radius: 12px; transition: all 0.2s ease; outline: none; font-weight: 700; flex: 0 0 auto;';
-        nextBtn.textContent = 'Next Fence ▶';
+        nextBtn.style.cssText = 'background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.2); color: #ddd; padding: 8px 12px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; border-radius: 8px; transition: all 0.2s ease; outline: none; font-weight: 700; flex: 0 0 auto;';
+        nextBtn.textContent = '▶';
         nextBtn.onclick = () => changeFence(1);
         fenceRow.appendChild(prevBtn);
         fenceRow.appendChild(fenceInfo);
