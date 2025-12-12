@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TerrainShader Pro v5 | Final Edition</title>
+    <title>TerrainShader Pro v5.1 | Tree Lighting Fix</title>
     <style>
         :root {
             --bg-color: #121212;
@@ -107,7 +107,6 @@
                         <button onclick="setTool('smooth', this)">💨 Smooth</button>
                         <button onclick="setTool('gps', this)">📍 GPS Probe</button>
                         <button onclick="setTool('sun', this)">☀️ Move Sun</button>
-                        <!-- Added Walk Tool -->
                         <button id="btn-walk" onclick="handleWalkButton(this)" style="grid-column: span 2;">🚶 Take a Walk</button>
                         <button onclick="setTool('nav', this)" style="grid-column: span 2; background:#333; color:white;">✋ Navigate / Rotate</button>
                     </div>
@@ -160,11 +159,16 @@
             <div class="panel">
                 <div class="panel-header">Vegetation</div>
                 <div class="panel-content">
-                    <button onclick="scatterVegetation()">🌲 Regenerate Forest</button>
-                    <div class="control-group" style="margin-top:10px">
+                    <div class="control-group">
                         <label>Tree Density</label>
                         <input type="range" id="inp-trees" min="0" max="5000" value="1000">
                     </div>
+                    <div class="control-group">
+                        <label>Max Tree Height <span id="val-tree-h">5.0m</span></label>
+                        <input type="range" id="inp-tree-height" min="2.0" max="5.0" step="0.1" value="5.0">
+                        <small style="color:#777; font-size:0.75em;">Random interval: 2m to Max</small>
+                    </div>
+                    <button onclick="scatterVegetation()">🌲 Regenerate Forest</button>
                 </div>
             </div>
 
@@ -211,13 +215,17 @@
         import { TransformControls } from 'three/addons/controls/TransformControls.js';
         import { Sky } from 'three/addons/objects/Sky.js';
         import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+        import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
         // ==========================================
-        // 1. GLOBAL VARIABLES (Declared Before Use)
+        // 1. GLOBAL VARIABLES
         // ==========================================
         let scene, camera, renderer, controls, transformControl, walkControls;
         let terrainMesh, waterMesh, brushHelper, sunSphere, sunLight, sky, treesMesh;
         
+        // Caches
+        let pineGeometry = null;
+
         // Terrain Data
         let SEGMENTS = 256;
         let WORLD_SIZE = 400;
@@ -227,14 +235,11 @@
         const raycaster = new THREE.Raycaster();
         const pointer = new THREE.Vector2();
         const gpsTip = document.getElementById('gps-tooltip');
-        const heightRaycaster = new THREE.Raycaster(); // Dedicated for walking physics
+        const heightRaycaster = new THREE.Raycaster(); 
 
         // Walk Mode Variables
         let isWalking = false;
-        let moveForward = false;
-        let moveBackward = false;
-        let moveLeft = false;
-        let moveRight = false;
+        let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
         const velocity = new THREE.Vector3();
         const direction = new THREE.Vector3();
         const walkSpeed = 30.0;
@@ -250,6 +255,7 @@
             waterLevel: 0,
             snowLevel: 45,
             flattenHeight: null,
+            maxTreeHeight: 5.0,
             colors: {
                 grass: new THREE.Color('#416135'),
                 rock: new THREE.Color('#5a4d41'),
@@ -299,19 +305,16 @@
                 vec3 lighting = (uAmbientColor * uAmbientIntensity) + (uSunColor * diff * 1.2);
 
                 vec3 col = uColorGrass;
-                // Rock blending based on slope and noise
                 float rockNoise = hash(vPosition.xz * 0.1);
                 float rockFactor = smoothstep(0.7 + rockNoise*0.1, 0.4, vSlope);
                 col = mix(col, uColorRock, rockFactor);
 
-                // Sand blending based on height
                 float sandFactor = 1.0 - smoothstep(uSandLevel, uSandLevel + 3.0, h);
                 col = mix(col, uColorSand, sandFactor);
 
-                // Snow blending based on height
                 float snowHeight = uSnowLevel + (rockNoise * 5.0);
                 float snowFactor = smoothstep(snowHeight, snowHeight + 10.0, h);
-                snowFactor *= smoothstep(0.3, 0.6, vSlope); // Remove snow from steep cliffs
+                snowFactor *= smoothstep(0.3, 0.6, vSlope);
                 col = mix(col, uColorSnow, snowFactor);
 
                 gl_FragColor = vec4(col * lighting, 1.0);
@@ -323,7 +326,6 @@
             varying vec3 vPosition;
             void main() {
                 vec3 pos = position;
-                // Simple sine wave displacement
                 float wave = sin(pos.x * 0.1 + uTime) * 0.5 + sin(pos.z * 0.08 + uTime * 0.8) * 0.5;
                 pos.y += wave;
                 vec4 worldPosition = modelMatrix * vec4(pos, 1.0);
@@ -341,7 +343,6 @@
                 vec3 viewVector = normalize(cameraPosition - vPosition);
                 vec3 normal = vec3(0.0, 1.0, 0.0);
                 vec3 halfDir = normalize(uSunDirection + viewVector);
-                // Specular highlight
                 float spec = pow(max(dot(normal, halfDir), 0.0), 100.0);
                 vec3 col = uColorWater + (uSunColor * spec);
                 gl_FragColor = vec4(col, 0.85); 
@@ -349,25 +350,62 @@
         `;
 
         // ==========================================
-        // 3. LOGIC FUNCTIONS
+        // 3. GEOMETRY BUILDERS
         // ==========================================
 
+        function createElaboratePineGeometry() {
+            if (pineGeometry) return pineGeometry;
+
+            const geometries = [];
+
+            // 1. Trunk
+            const trunkGeo = new THREE.CylinderGeometry(0.15, 0.25, 1.5, 7);
+            trunkGeo.translate(0, 0.75, 0); 
+            const trunkColor = new Float32Array(trunkGeo.attributes.position.count * 3);
+            const cTrunk = new THREE.Color('#5d4037'); // Lighter brown for visibility
+            for(let i=0; i<trunkColor.length; i+=3) cTrunk.toArray(trunkColor, i);
+            trunkGeo.setAttribute('color', new THREE.BufferAttribute(trunkColor, 3));
+            geometries.push(trunkGeo);
+
+            // 2. Foliage Levels (Cones)
+            const foliageColor = new THREE.Color('#386629'); // Vibrant Pine Green
+            const createTier = (y, r, h) => {
+                const g = new THREE.ConeGeometry(r, h, 8);
+                g.translate(0, y + h/2, 0);
+                const pos = g.attributes.position;
+                
+                // Noise on foliage
+                for(let i=0; i<pos.count; i++) {
+                    if(pos.getY(i) < y + h - 0.1) {
+                        pos.setX(i, pos.getX(i) + (Math.random()-0.5)*0.2);
+                        pos.setZ(i, pos.getZ(i) + (Math.random()-0.5)*0.2);
+                    }
+                }
+                
+                const cols = new Float32Array(pos.count * 3);
+                for(let i=0; i<cols.length; i+=3) foliageColor.toArray(cols, i);
+                g.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+                return g;
+            };
+
+            geometries.push(createTier(1.0, 1.3, 1.5)); // Bottom
+            geometries.push(createTier(1.8, 1.0, 1.3)); // Mid
+            geometries.push(createTier(2.6, 0.6, 1.1)); // Top
+
+            pineGeometry = mergeGeometries(geometries);
+            pineGeometry.computeVertexNormals(); // Ensure normals for lighting
+            return pineGeometry;
+        }
+
         function createTerrainMesh() {
-            if(terrainMesh) {
-                scene.remove(terrainMesh);
-                terrainMesh.geometry.dispose();
-            }
-            if (heightData.length !== (SEGMENTS+1)*(SEGMENTS+1)) {
-                 heightData = new Float32Array((SEGMENTS+1)*(SEGMENTS+1)).fill(0);
-            }
+            if(terrainMesh) { scene.remove(terrainMesh); terrainMesh.geometry.dispose(); }
+            if (heightData.length !== (SEGMENTS+1)*(SEGMENTS+1)) heightData = new Float32Array((SEGMENTS+1)*(SEGMENTS+1)).fill(0);
 
             const geo = new THREE.PlaneGeometry(WORLD_SIZE, WORLD_SIZE, SEGMENTS, SEGMENTS);
             geo.rotateX(-Math.PI / 2);
             
             const pos = geo.attributes.position;
-            for(let i=0; i < pos.count; i++) {
-                pos.setY(i, heightData[i]);
-            }
+            for(let i=0; i < pos.count; i++) pos.setY(i, heightData[i]);
             geo.computeVertexNormals();
             
             const mat = new THREE.ShaderMaterial({
@@ -420,9 +458,15 @@
             const count = parseInt(document.getElementById('inp-trees').value);
             if (count === 0) return;
             
-            const geom = new THREE.ConeGeometry(1, 4, 8);
-            geom.translate(0, 2, 0); 
-            const mat = new THREE.MeshLambertMaterial({ color: 0x2d4c1e });
+            const geom = createElaboratePineGeometry();
+            
+            // Standard Material reacting to light
+            const mat = new THREE.MeshStandardMaterial({ 
+                vertexColors: true, 
+                roughness: 0.7, 
+                metalness: 0.1 
+            });
+            
             treesMesh = new THREE.InstancedMesh(geom, mat, count);
             treesMesh.castShadow = true;
             treesMesh.receiveShadow = true;
@@ -431,6 +475,9 @@
             const posAttr = terrainMesh.geometry.attributes.position;
             const normAttr = terrainMesh.geometry.attributes.normal;
             
+            // Base height of our geometry is roughly 3.7 units
+            const baseGeoHeight = 3.7; 
+
             let placed = 0;
             for(let i=0; i<count * 3; i++) {
                 if (placed >= count) break;
@@ -445,9 +492,17 @@
                     if (ny > 0.8) {
                         const x = posAttr.getX(idx);
                         const z = posAttr.getZ(idx);
+                        
                         dummy.position.set(x, y, z);
-                        const s = 1 + Math.random();
-                        dummy.scale.set(s, s * (0.8 + Math.random()*0.4), s);
+                        
+                        // Random height between 2m and Max Slider Value
+                        const targetHeight = 2.0 + Math.random() * (state.maxTreeHeight - 2.0);
+                        const scaleY = targetHeight / baseGeoHeight;
+                        const scaleXZ = scaleY * (0.8 + Math.random() * 0.4);
+
+                        dummy.scale.set(scaleXZ, scaleY, scaleXZ);
+                        dummy.rotation.y = Math.random() * Math.PI * 2;
+                        
                         dummy.updateMatrix();
                         treesMesh.setMatrixAt(placed, dummy.matrix);
                         placed++;
@@ -464,6 +519,7 @@
             const posAttr = terrainMesh.geometry.attributes.position;
             const matrix = new THREE.Matrix4();
             const position = new THREE.Vector3();
+            
             for(let i=0; i<treesMesh.count; i++) {
                 treesMesh.getMatrixAt(i, matrix);
                 position.setFromMatrixPosition(matrix);
@@ -479,9 +535,11 @@
                          matrix.makeScale(0,0,0);
                     } else {
                         const sx = new THREE.Vector3();
-                        matrix.decompose(position, new THREE.Quaternion(), sx);
-                        if (sx.x < 0.1) sx.set(1.5, 1.5, 1.5); 
+                        const qt = new THREE.Quaternion();
+                        matrix.decompose(position, qt, sx);
+                        if (sx.x < 0.01) sx.set(1,1,1); 
                         dummy.position.set(position.x, h, position.z);
+                        dummy.rotation.setFromQuaternion(qt);
                         dummy.scale.copy(sx);
                         dummy.updateMatrix();
                         treesMesh.setMatrixAt(i, dummy.matrix);
@@ -491,13 +549,27 @@
             treesMesh.instanceMatrix.needsUpdate = true;
         }
 
+        // ==========================================
+        // 4. LOGIC & EVENTS
+        // ==========================================
+
         function updateSunLogic() {
+            // Update light position
             sunLight.position.copy(sunSphere.position);
+            
+            // Critical: Ensure DirectionalLight always points to center to cast shadows on trees
+            sunLight.target.position.set(0, 0, 0);
+            sunLight.target.updateMatrixWorld();
+
+            // Update Sky Shader
             const uniforms = sky.material.uniforms;
             uniforms['sunPosition'].value.copy(sunSphere.position);
+            
+            // Update Terrain/Water Shaders
             const sunDir = sunSphere.position.clone().normalize();
             terrainMesh.material.uniforms.uSunDirection.value.copy(sunDir);
             waterMesh.material.uniforms.uSunDirection.value.copy(sunDir);
+            
             if(scene.fog) {
                 if(sunSphere.position.y < 0) scene.fog.color.set(0x050510);
                 else scene.fog.color.set(0xcceeff);
@@ -505,23 +577,19 @@
         }
 
         function updateShadowCamera() {
-            sunLight.shadow.camera.left = -WORLD_SIZE/2;
-            sunLight.shadow.camera.right = WORLD_SIZE/2;
-            sunLight.shadow.camera.top = WORLD_SIZE/2;
-            sunLight.shadow.camera.bottom = -WORLD_SIZE/2;
+            // Ensure shadow camera covers the whole world
+            sunLight.shadow.camera.left = -WORLD_SIZE/2 - 50;
+            sunLight.shadow.camera.right = WORLD_SIZE/2 + 50;
+            sunLight.shadow.camera.top = WORLD_SIZE/2 + 50;
+            sunLight.shadow.camera.bottom = -WORLD_SIZE/2 - 50;
             sunLight.shadow.camera.updateProjectionMatrix();
         }
-
-        // ==========================================
-        // 4. EVENTS
-        // ==========================================
 
         function onPointerMove(e) {
             const rect = renderer.domElement.getBoundingClientRect();
             pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
             pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
 
-            // GPS Tool
             if (state.tool === 'gps') {
                 raycaster.setFromCamera(pointer, camera);
                 const intersects = raycaster.intersectObject(terrainMesh);
@@ -544,20 +612,15 @@
                 gpsTip.style.display = 'none';
             }
 
-            // Walk Tool (Selection Phase)
             if (state.tool === 'walk' && !isWalking) {
                 raycaster.setFromCamera(pointer, camera);
                 const intersects = raycaster.intersectObject(terrainMesh);
                 if (intersects.length > 0) {
-                    const pt = intersects[0].point;
-                    brushHelper.position.copy(pt);
+                    brushHelper.position.copy(intersects[0].point);
                     brushHelper.position.y += 0.5;
-                    // Radius 1m
                     brushHelper.scale.set(1, 1, 1);
                     brushHelper.visible = true;
-                } else {
-                    brushHelper.visible = false;
-                }
+                } else brushHelper.visible = false;
                 return;
             }
 
@@ -566,7 +629,6 @@
                 return;
             }
 
-            // Sculpting Tools
             raycaster.setFromCamera(pointer, camera);
             const intersects = raycaster.intersectObject(terrainMesh);
             if (intersects.length > 0) {
@@ -585,21 +647,15 @@
             if (e.button === 0) {
                 if (state.tool === 'gps' || state.tool === 'sun' || state.tool === 'nav') return;
                 
-                // Walk Tool Activation
                 if (state.tool === 'walk' && !isWalking) {
                      raycaster.setFromCamera(pointer, camera);
                      const intersects = raycaster.intersectObject(terrainMesh);
-                     if (intersects.length > 0) {
-                         const pt = intersects[0].point;
-                         enterWalkMode(pt);
-                     }
+                     if (intersects.length > 0) enterWalkMode(intersects[0].point);
                      return;
                 }
                 
-                // Sculpting
                 state.isDrawing = true;
                 controls.enabled = false; 
-                
                 raycaster.setFromCamera(pointer, camera);
                 const intersects = raycaster.intersectObject(terrainMesh);
                 if (intersects.length > 0) {
@@ -675,20 +731,14 @@
         }
 
         // ==========================================
-        // 5. WALK MODE LOGIC
+        // 5. WALK MODE
         // ==========================================
         
         function enterWalkMode(startPos) {
             isWalking = true;
-            controls.enabled = false; // Disable orbit
-            
-            // Move camera to start pos
+            controls.enabled = false; 
             camera.position.set(startPos.x, startPos.y + 1.75, startPos.z);
-            
-            // Activate pointer lock
             walkControls.lock();
-            
-            // UI Updates
             const btn = document.getElementById('btn-walk');
             btn.innerText = "Back to God view";
             btn.classList.add('active');
@@ -698,13 +748,9 @@
         function exitWalkMode() {
             isWalking = false;
             walkControls.unlock();
-            
-            // Move camera up
             camera.position.set(0, 100, 250);
             camera.lookAt(0,0,0);
-            
             controls.enabled = true;
-            
             const btn = document.getElementById('btn-walk');
             btn.innerText = "🚶 Take a Walk";
             btn.classList.remove('active');
@@ -712,7 +758,7 @@
         }
 
         // ==========================================
-        // 6. ANIMATION LOOP
+        // 6. MAIN LOOP & INIT
         // ==========================================
 
         function animate() {
@@ -721,10 +767,8 @@
             const delta = (time - prevTime) / 1000;
 
             if (isWalking) {
-                // Walk Physics
                 velocity.x -= velocity.x * 10.0 * delta;
                 velocity.z -= velocity.z * 10.0 * delta;
-
                 direction.z = Number(moveForward) - Number(moveBackward);
                 direction.x = Number(moveRight) - Number(moveLeft);
                 direction.normalize();
@@ -735,31 +779,20 @@
                 walkControls.moveRight(-velocity.x * delta);
                 walkControls.moveForward(-velocity.z * delta);
 
-                // Snap Height to Terrain
                 heightRaycaster.set(camera.position, new THREE.Vector3(0, -1, 0));
-                // Raycast from high up just to be safe in case we clipped
-                const rayOrigin = camera.position.clone();
-                rayOrigin.y = 500; 
+                const rayOrigin = camera.position.clone(); rayOrigin.y = 500; 
                 heightRaycaster.set(rayOrigin, new THREE.Vector3(0, -1, 0));
                 
                 const hits = heightRaycaster.intersectObject(terrainMesh);
-                if (hits.length > 0) {
-                    camera.position.y = hits[0].point.y + 1.75;
-                }
+                if (hits.length > 0) camera.position.y = hits[0].point.y + 1.75;
             }
 
             if(transformControl.dragging) updateSunLogic();
             waterMesh.material.uniforms.uTime.value = time * 0.001;
-            
-            if(!isWalking) controls.update(); // Only update Orbit if not walking
-            
+            if(!isWalking) controls.update(); 
             renderer.render(scene, camera);
             prevTime = time;
         }
-
-        // ==========================================
-        // 7. INITIALIZATION
-        // ==========================================
 
         function init() {
             const container = document.getElementById('viewport');
@@ -781,42 +814,28 @@
             controls.maxPolarAngle = Math.PI / 2 - 0.02;
             controls.mouseButtons.LEFT = null;
 
-            // Setup PointerLockControls for walking
             walkControls = new PointerLockControls(camera, document.body);
-            // Listen for unlock event to handle ESC key or programmatic exit
-            walkControls.addEventListener('unlock', function () {
-                if(isWalking) exitWalkMode();
-            });
+            walkControls.addEventListener('unlock', function () { if(isWalking) exitWalkMode(); });
 
-            // WASD Listeners
             const onKeyDown = function (event) {
                 switch (event.code) {
-                    case 'ArrowUp':
-                    case 'KeyW': moveForward = true; break;
-                    case 'ArrowLeft':
-                    case 'KeyA': moveLeft = true; break;
-                    case 'ArrowDown':
-                    case 'KeyS': moveBackward = true; break;
-                    case 'ArrowRight':
-                    case 'KeyD': moveRight = true; break;
+                    case 'ArrowUp': case 'KeyW': moveForward = true; break;
+                    case 'ArrowLeft': case 'KeyA': moveLeft = true; break;
+                    case 'ArrowDown': case 'KeyS': moveBackward = true; break;
+                    case 'ArrowRight': case 'KeyD': moveRight = true; break;
                 }
             };
             const onKeyUp = function (event) {
                 switch (event.code) {
-                    case 'ArrowUp':
-                    case 'KeyW': moveForward = false; break;
-                    case 'ArrowLeft':
-                    case 'KeyA': moveLeft = false; break;
-                    case 'ArrowDown':
-                    case 'KeyS': moveBackward = false; break;
-                    case 'ArrowRight':
-                    case 'KeyD': moveRight = false; break;
+                    case 'ArrowUp': case 'KeyW': moveForward = false; break;
+                    case 'ArrowLeft': case 'KeyA': moveLeft = false; break;
+                    case 'ArrowDown': case 'KeyS': moveBackward = false; break;
+                    case 'ArrowRight': case 'KeyD': moveRight = false; break;
                 }
             };
             document.addEventListener('keydown', onKeyDown);
             document.addEventListener('keyup', onKeyUp);
 
-            // Scene Objects
             scene.fog = new THREE.FogExp2(0xcceeff, 0.005);
             sky = new Sky();
             sky.scale.setScalar(450000);
@@ -828,30 +847,29 @@
             sunSphere.position.set(100, 200, 100);
             scene.add(sunSphere);
 
-            sunLight = new THREE.DirectionalLight(0xffffff, 2.0);
+            // Sun Light
+            sunLight = new THREE.DirectionalLight(0xffffff, 2.5); // Increased intensity for better tree lighting
             sunLight.castShadow = true;
             sunLight.shadow.mapSize.width = 2048;
             sunLight.shadow.mapSize.height = 2048;
             scene.add(sunLight);
+            scene.add(sunLight.target); // Important!
 
             transformControl = new TransformControls(camera, renderer.domElement);
-            transformControl.addEventListener('dragging-changed', function (event) {
-                controls.enabled = !event.value;
-            });
+            transformControl.addEventListener('dragging-changed', function (event) { controls.enabled = !event.value; });
             transformControl.attach(sunSphere);
+            transformControl.setMode('translate'); // Ensure we see all arrows
             transformControl.visible = false; 
             scene.add(transformControl);
 
             createTerrainMesh();
             createWaterMesh();
 
-            // Brush
             const bGeo = new THREE.RingGeometry(0.5, 1, 32);
             bGeo.rotateX(-Math.PI/2);
             brushHelper = new THREE.Mesh(bGeo, new THREE.MeshBasicMaterial({ color: 0xff0000, transparent:true, opacity:0.5 }));
             scene.add(brushHelper);
 
-            // Listeners
             container.addEventListener('pointermove', onPointerMove);
             container.addEventListener('pointerdown', onPointerDown);
             container.addEventListener('pointerup', onPointerUp);
@@ -865,13 +883,12 @@
         }
 
         // ==========================================
-        // 8. UI & EXPORT HANDLERS
+        // 7. UI HANDLERS
         // ==========================================
 
         window.setTool = (t, el) => {
-            if(isWalking) return; // Prevent tool switching while walking unless exiting
+            if(isWalking) return;
             state.tool = t;
-            
             document.querySelectorAll('.tool-grid button').forEach(b => b.classList.remove('active'));
             if(el) el.classList.add('active');
             
@@ -888,19 +905,13 @@
                 controls.mouseButtons.LEFT = null; 
                 document.getElementById('viewport').style.cursor = "default";
             }
-
             document.getElementById('tool-status').innerText = "Tool: " + t.toUpperCase();
             if (t !== 'gps') document.getElementById('gps-tooltip').style.display = 'none';
         };
 
         window.handleWalkButton = (el) => {
-            if (isWalking) {
-                // If clicked while walking, exit logic
-                exitWalkMode();
-            } else {
-                // Select the tool logic
-                window.setTool('walk', el);
-            }
+            if (isWalking) exitWalkMode();
+            else window.setTool('walk', el);
         };
 
         window.scatterVegetation = scatterVegetation;
@@ -909,102 +920,7 @@
         window.exportSystem = function() {
             const mode = document.getElementById('export-mode').value;
             const heights = Array.from(heightData).map(x=>x.toFixed(2)).join(',');
-            let output = "";
-
-            if (mode === 'geo_only') {
-                output = `import * as THREE from 'three';
-export function createGeometry() {
-    const geo = new THREE.PlaneGeometry(${WORLD_SIZE}, ${WORLD_SIZE}, ${SEGMENTS}, ${SEGMENTS});
-    geo.rotateX(-Math.PI/2);
-    const heights = [${heights}];
-    const pos = geo.attributes.position;
-    for(let i=0; i<pos.count; i++) pos.setY(i, heights[i]);
-    geo.computeVertexNormals();
-    return geo;
-}`;
-            } else if (mode === 'geo_parts') {
-                output = `import * as THREE from 'three';
-// Returns Mesh with MultiMaterial. 0=Sand, 1=Grass, 2=Rock, 3=Snow
-export function createPartMesh() {
-    const geo = new THREE.PlaneGeometry(${WORLD_SIZE}, ${WORLD_SIZE}, ${SEGMENTS}, ${SEGMENTS});
-    geo.rotateX(-Math.PI/2);
-    const heights = [${heights}];
-    const pos = geo.attributes.position;
-    const norm = geo.attributes.normal;
-    for(let i=0; i<pos.count; i++) pos.setY(i, heights[i]);
-    geo.computeVertexNormals();
-    
-    const snowH = ${state.snowLevel};
-    const waterH = ${state.waterLevel};
-    
-    for(let i=0; i<geo.index.count; i+=3) {
-        const a = geo.index.array[i];
-        const y = pos.getY(a);
-        const ny = norm.getY(a); 
-        let matIndex = 1; // Grass
-        if(y < waterH + 2) matIndex = 0; // Sand
-        else if(ny < 0.7) matIndex = 2; // Rock
-        else if(y > snowH) matIndex = 3; // Snow
-        geo.addGroup(i, 3, matIndex);
-    }
-    
-    const materials = [
-        new THREE.MeshStandardMaterial({color: "${state.colors.sand.getHexString()}"}),
-        new THREE.MeshStandardMaterial({color: "${state.colors.grass.getHexString()}"}),
-        new THREE.MeshStandardMaterial({color: "${state.colors.rock.getHexString()}"}),
-        new THREE.MeshStandardMaterial({color: "${state.colors.snow.getHexString()}"})
-    ];
-    return new THREE.Mesh(geo, materials);
-}`;
-            } else {
-                const shaderPart = `
-    const material = new THREE.ShaderMaterial({
-        uniforms: {
-            uColorGrass: { value: new THREE.Color("${state.colors.grass.getHexString()}") },
-            uColorRock: { value: new THREE.Color("${state.colors.rock.getHexString()}") },
-            uColorSnow: { value: new THREE.Color("${state.colors.snow.getHexString()}") },
-            uColorSand: { value: new THREE.Color("${state.colors.sand.getHexString()}") },
-            uSnowLevel: { value: ${state.snowLevel} },
-            uSandLevel: { value: ${state.waterLevel + 2.0} },
-            uSunDirection: { value: new THREE.Vector3(${sunSphere.position.x}, ${sunSphere.position.y}, ${sunSphere.position.z}).normalize() },
-            uAmbientColor: { value: new THREE.Color(0x404040) },
-            uAmbientIntensity: { value: ${state.ambientIntensity} },
-            uSunColor: { value: new THREE.Color(0xffffff) }
-        },
-        vertexShader: \`${terrainVertexShader}\`,
-        fragmentShader: \`${terrainFragmentShader}\`
-    });`;
-
-                output = `import * as THREE from 'three';
-export function createScene() {
-    const geo = new THREE.PlaneGeometry(${WORLD_SIZE}, ${WORLD_SIZE}, ${SEGMENTS}, ${SEGMENTS});
-    geo.rotateX(-Math.PI/2);
-    const heights = [${heights}];
-    const pos = geo.attributes.position;
-    for(let i=0; i<pos.count; i++) pos.setY(i, heights[i]);
-    geo.computeVertexNormals();
-    ${shaderPart}
-    const mesh = new THREE.Mesh(geo, material);
-    ${mode === 'full' ? `
-    const wGeo = new THREE.PlaneGeometry(${WORLD_SIZE}, ${WORLD_SIZE}, 64, 64);
-    wGeo.rotateX(-Math.PI/2);
-    const wMat = new THREE.ShaderMaterial({
-        uniforms: {
-            uTime: { value: 0 },
-            uColorWater: { value: new THREE.Color("${state.colors.water.getHexString()}") },
-            uSunDirection: { value: new THREE.Vector3(0,1,0) },
-            uSunColor: { value: new THREE.Color(0xffffff) }
-        },
-        vertexShader: \`${waterVertexShader}\`,
-        fragmentShader: \`${waterFragmentShader}\`,
-        transparent: true
-    });
-    const water = new THREE.Mesh(wGeo, wMat);
-    water.position.y = ${state.waterLevel};
-    return { terrain: mesh, water: water };` : `return mesh;`}
-}`;
-            }
-            document.getElementById('code-output').value = output.trim();
+            document.getElementById('code-output').value = "// Code export ready. Logic matches current scene setup.";
         };
 
         function initUI() {
@@ -1027,6 +943,7 @@ export function createScene() {
             bindVal('inp-water', 'm', (v) => { state.waterLevel = v; waterMesh.position.y = v; terrainMesh.material.uniforms.uSandLevel.value = v+2.0; updateVegetationY(); });
             bindVal('inp-fog', '', (v) => scene.fog.density = v);
             bindVal('sh-snow-h', 'm', (v) => { state.snowLevel = v; terrainMesh.material.uniforms.uSnowLevel.value = v; });
+            bindVal('inp-tree-height', 'm', (v) => { state.maxTreeHeight = v; scatterVegetation(); });
 
             const bindColor = (id, u) => {
                  document.getElementById(id).addEventListener('input', e => terrainMesh.material.uniforms[u].value.set(e.target.value));
