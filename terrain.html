@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TerrainShader Pro v5.1 | Tree Lighting Fix</title>
+    <title>TerrainShader Pro v5.2 | Solid Geometry Fix</title>
     <style>
         :root {
             --bg-color: #121212;
@@ -362,26 +362,20 @@
             const trunkGeo = new THREE.CylinderGeometry(0.15, 0.25, 1.5, 7);
             trunkGeo.translate(0, 0.75, 0); 
             const trunkColor = new Float32Array(trunkGeo.attributes.position.count * 3);
-            const cTrunk = new THREE.Color('#5d4037'); // Lighter brown for visibility
+            const cTrunk = new THREE.Color('#5d4037'); 
             for(let i=0; i<trunkColor.length; i+=3) cTrunk.toArray(trunkColor, i);
             trunkGeo.setAttribute('color', new THREE.BufferAttribute(trunkColor, 3));
             geometries.push(trunkGeo);
 
             // 2. Foliage Levels (Cones)
-            const foliageColor = new THREE.Color('#386629'); // Vibrant Pine Green
+            // Removed noise logic to keep geometry watertight (no gaps/tears)
+            const foliageColor = new THREE.Color('#386629'); 
             const createTier = (y, r, h) => {
-                const g = new THREE.ConeGeometry(r, h, 8);
+                // Ensure openEnded is false (default) for solid cones
+                const g = new THREE.ConeGeometry(r, h, 8, 1, false); 
                 g.translate(0, y + h/2, 0);
+                
                 const pos = g.attributes.position;
-                
-                // Noise on foliage
-                for(let i=0; i<pos.count; i++) {
-                    if(pos.getY(i) < y + h - 0.1) {
-                        pos.setX(i, pos.getX(i) + (Math.random()-0.5)*0.2);
-                        pos.setZ(i, pos.getZ(i) + (Math.random()-0.5)*0.2);
-                    }
-                }
-                
                 const cols = new Float32Array(pos.count * 3);
                 for(let i=0; i<cols.length; i+=3) foliageColor.toArray(cols, i);
                 g.setAttribute('color', new THREE.BufferAttribute(cols, 3));
@@ -393,7 +387,7 @@
             geometries.push(createTier(2.6, 0.6, 1.1)); // Top
 
             pineGeometry = mergeGeometries(geometries);
-            pineGeometry.computeVertexNormals(); // Ensure normals for lighting
+            pineGeometry.computeVertexNormals(); 
             return pineGeometry;
         }
 
@@ -848,17 +842,17 @@
             scene.add(sunSphere);
 
             // Sun Light
-            sunLight = new THREE.DirectionalLight(0xffffff, 2.5); // Increased intensity for better tree lighting
+            sunLight = new THREE.DirectionalLight(0xffffff, 2.5); 
             sunLight.castShadow = true;
             sunLight.shadow.mapSize.width = 2048;
             sunLight.shadow.mapSize.height = 2048;
             scene.add(sunLight);
-            scene.add(sunLight.target); // Important!
+            scene.add(sunLight.target); 
 
             transformControl = new TransformControls(camera, renderer.domElement);
             transformControl.addEventListener('dragging-changed', function (event) { controls.enabled = !event.value; });
             transformControl.attach(sunSphere);
-            transformControl.setMode('translate'); // Ensure we see all arrows
+            transformControl.setMode('translate'); 
             transformControl.visible = false; 
             scene.add(transformControl);
 
