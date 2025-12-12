@@ -3,66 +3,101 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TerrainShader Pro v5.2 | Solid Geometry Fix</title>
+    <title>TerrainShader Pro v6.0 | Atmospheric Perspective</title>
     <style>
         :root {
-            --bg-color: #121212;
-            --panel-color: #1e1e1e;
-            --text-color: #e0e0e0;
-            --accent-color: #ff9f1c; /* Sun/Gold Accent */
-            --accent-hover: #e08e1a;
-            --border-color: #333;
-            --input-bg: #2a2a2a;
+            --bg-color: #0d0e12; /* Darker, more premium background */
+            --panel-color: #1a1b20;
+            --text-color: #b0b3b8;
+            --accent-color: #64ffda; /* Cyan accent for a tech/pro feel */
+            --accent-hover: #4adbc0;
+            --border-color: #2d2f36;
+            --input-bg: #23252b;
         }
 
-        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', sans-serif; background: var(--bg-color); color: var(--text-color); display: flex; height: 100vh; }
+        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: var(--bg-color); color: var(--text-color); display: flex; height: 100vh; font-size: 14px; }
         
         /* Layout */
         #dashboard {
-            width: 350px; background: var(--panel-color); border-right: 1px solid var(--border-color);
-            display: flex; flex-direction: column; z-index: 10; box-shadow: 4px 0 15px rgba(0,0,0,0.4);
+            width: 360px; background: var(--panel-color); border-right: 1px solid var(--border-color);
+            display: flex; flex-direction: column; z-index: 10; box-shadow: 4px 0 20px rgba(0,0,0,0.5);
         }
-        .header { padding: 20px; border-bottom: 1px solid var(--border-color); font-weight: 700; font-size: 1.2em; letter-spacing: 1px; color: #fff; background: linear-gradient(45deg, #1e1e1e, #2a2a2a); }
-        .header span { color: var(--accent-color); }
+        .header { 
+            padding: 24px 20px; border-bottom: 1px solid var(--border-color); 
+            font-weight: 800; font-size: 1.3em; letter-spacing: 0.5px; 
+            color: #fff; background: linear-gradient(135deg, #1a1b20, #252830); 
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .header span { color: var(--accent-color); text-shadow: 0 0 10px rgba(100, 255, 218, 0.3); }
+        .version-badge { background: #333; padding: 2px 6px; border-radius: 4px; font-size: 0.6em; color: #888; }
         
-        .scroll-area { flex: 1; overflow-y: auto; padding: 15px; }
+        .scroll-area { flex: 1; overflow-y: auto; padding: 20px; }
         .scroll-area::-webkit-scrollbar { width: 6px; }
-        .scroll-area::-webkit-scrollbar-thumb { background: #444; border-radius: 3px; }
+        .scroll-area::-webkit-scrollbar-track { background: var(--panel-color); }
+        .scroll-area::-webkit-scrollbar-thumb { background: #3e4149; border-radius: 3px; }
 
         /* UI Components */
-        .panel { background: #262626; border: 1px solid var(--border-color); border-radius: 6px; margin-bottom: 16px; overflow: hidden; }
-        .panel-header { padding: 12px 15px; background: #2f2f2f; font-size: 0.85em; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
+        .panel { background: #202227; border: 1px solid var(--border-color); border-radius: 8px; margin-bottom: 20px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.2); transition: border-color 0.2s; }
+        .panel:hover { border-color: #3d4049; }
+        .panel-header { padding: 12px 15px; background: #252830; font-size: 0.8em; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #fff; border-bottom: 1px solid var(--border-color); }
         .panel-content { padding: 15px; }
 
-        .control-group { margin-bottom: 15px; }
-        .control-group label { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 0.85em; color: #aaa; }
+        .control-group { margin-bottom: 16px; }
+        .control-group:last-child { margin-bottom: 0; }
+        .control-group label { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 0.85em; font-weight: 500; color: #ccc; }
+        .control-group label span { font-family: monospace; color: var(--accent-color); opacity: 0.8; }
         
-        input[type="range"] { width: 100%; -webkit-appearance: none; background: transparent; cursor: pointer; }
-        input[type="range"]::-webkit-slider-runnable-track { width: 100%; height: 4px; background: #444; border-radius: 2px; }
-        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; height: 14px; width: 14px; border-radius: 50%; background: var(--accent-color); margin-top: -5px; box-shadow: 0 0 5px rgba(0,0,0,0.5); }
+        input[type="range"] { 
+            width: 100%; -webkit-appearance: none; background: transparent; cursor: pointer; display: block; 
+        }
+        input[type="range"]::-webkit-slider-runnable-track { 
+            width: 100%; height: 4px; background: #333; border-radius: 2px; transition: background 0.2s; 
+        }
+        input[type="range"]:hover::-webkit-slider-runnable-track { background: #444; }
+        input[type="range"]::-webkit-slider-thumb { 
+            -webkit-appearance: none; height: 14px; width: 14px; border-radius: 50%; background: #fff; 
+            margin-top: -5px; box-shadow: 0 0 10px rgba(255,255,255,0.3); transition: transform 0.1s; 
+        }
+        input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.2); background: var(--accent-color); }
         
-        input[type="color"] { width: 100%; height: 30px; border: none; background: none; cursor: pointer; }
-        select { width: 100%; padding: 10px; background: var(--input-bg); border: 1px solid var(--border-color); color: white; border-radius: 4px; outline: none; }
+        .color-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-size: 0.85em; }
+        input[type="color"] { 
+            width: 40px; height: 24px; border: none; background: none; cursor: pointer; 
+            padding: 0; border-radius: 2px; overflow: hidden; 
+        }
+        input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+        input[type="color"]::-webkit-color-swatch { border: 1px solid #444; border-radius: 2px; }
 
-        button { width: 100%; padding: 10px; background: var(--input-bg); border: 1px solid var(--border-color); color: white; border-radius: 4px; cursor: pointer; font-size: 0.9em; transition: 0.2s; margin-bottom: 6px; }
-        button:hover { background: #353535; }
-        button.active { background: var(--accent-color); border-color: var(--accent-color); color: #000; font-weight: bold; }
-        button.primary { background: var(--accent-color); color: #000; font-weight: bold; border: none; margin-top: 5px;}
-        button.primary:hover { background: var(--accent-hover); }
+        button { width: 100%; padding: 12px; background: var(--input-bg); border: 1px solid var(--border-color); color: white; border-radius: 4px; cursor: pointer; font-size: 0.85em; font-weight: 600; transition: all 0.2s; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        button:hover { background: #2f323a; border-color: #555; }
+        button.active { background: rgba(100, 255, 218, 0.1); border-color: var(--accent-color); color: var(--accent-color); }
+        button.primary { background: var(--accent-color); color: #000; border: none; margin-top: 5px; box-shadow: 0 4px 12px rgba(100, 255, 218, 0.2); }
+        button.primary:hover { background: var(--accent-hover); box-shadow: 0 6px 16px rgba(100, 255, 218, 0.3); transform: translateY(-1px); }
 
         .tool-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
         
         /* Viewport */
         #viewport { flex: 1; position: relative; background: #000; cursor: default; }
-        #overlay { position: absolute; top: 20px; left: 20px; pointer-events: none; background: rgba(0,0,0,0.6); padding: 10px 15px; border-radius: 4px; font-size: 0.85em; color: #fff; backdrop-filter: blur(4px); border: 1px solid rgba(255,255,255,0.1); }
+        #overlay { 
+            position: absolute; top: 20px; left: 20px; pointer-events: none; 
+            background: rgba(15, 16, 20, 0.85); padding: 12px 18px; border-radius: 6px; 
+            font-size: 0.85em; color: #ddd; backdrop-filter: blur(8px); 
+            border: 1px solid rgba(255,255,255,0.08); box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        }
         
-        #gps-tooltip { position: fixed; background: rgba(0,0,0,0.85); border: 1px solid var(--accent-color); color: var(--accent-color); padding: 6px 12px; border-radius: 4px; font-family: monospace; font-size: 0.85em; pointer-events: none; display: none; z-index: 1000; transform: translate(15px, 15px); }
+        #gps-tooltip { 
+            position: fixed; background: rgba(0,0,0,0.9); border: 1px solid var(--accent-color); 
+            color: var(--accent-color); padding: 4px 8px; border-radius: 4px; 
+            font-family: 'Courier New', monospace; font-size: 0.8em; pointer-events: none; 
+            display: none; z-index: 1000; transform: translate(15px, 15px); 
+        }
 
         /* Modal */
-        #code-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 100; justify-content: center; align-items: center; }
-        .modal-box { background: #1e1e1e; width: 80%; height: 85%; border-radius: 8px; display: flex; flex-direction: column; border: 1px solid #444; box-shadow: 0 0 40px rgba(0,0,0,0.6); }
-        .modal-header { padding:15px; border-bottom:1px solid #444; background:#222; display:flex; justify-content:space-between; align-items: center; }
-        textarea { flex: 1; background: #151515; color: #aaddff; border: none; padding: 20px; font-family: monospace; resize: none; font-size: 0.9em; outline: none; }
+        #code-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 100; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
+        .modal-box { background: #1a1b20; width: 80%; max-width: 900px; height: 85%; border-radius: 12px; display: flex; flex-direction: column; border: 1px solid #333; box-shadow: 0 0 50px rgba(0,0,0,0.8); }
+        .modal-header { padding: 20px; border-bottom:1px solid #333; display:flex; justify-content:space-between; align-items: center; }
+        textarea { flex: 1; background: #121317; color: #aaddff; border: none; padding: 25px; font-family: 'Fira Code', monospace; resize: none; font-size: 0.9em; outline: none; line-height: 1.5; }
+        select { background: #222; color: #fff; border: 1px solid #444; padding: 5px 10px; border-radius: 4px; outline: none; }
     </style>
     
     <script type="importmap">
@@ -77,42 +112,44 @@
 <body>
 
     <div id="dashboard">
-        <div class="header">Terrain<span>Shader Pro v5</span></div>
+        <div class="header">
+            Terrain<span>Shader Pro</span>
+            <span class="version-badge">v6.0</span>
+        </div>
         <div class="scroll-area">
 
             <!-- World Config -->
             <div class="panel">
-                <div class="panel-header">World Settings</div>
+                <div class="panel-header">World Generator</div>
                 <div class="panel-content">
                     <div class="control-group">
                         <label>Size (Meters) <span id="val-size">400m</span></label>
                         <input type="range" id="inp-size" min="100" max="1000" step="50" value="400">
                     </div>
                     <div class="control-group">
-                        <label>Grid Resolution <span id="val-res">256</span></label>
+                        <label>Resolution <span id="val-res">256</span></label>
                         <input type="range" id="inp-res" min="64" max="512" step="64" value="256">
-                        <small style="color:#777; font-size:0.75em;">⚠️ Resets terrain shape</small>
                     </div>
                 </div>
             </div>
 
             <!-- Tools -->
             <div class="panel">
-                <div class="panel-header">Tools</div>
+                <div class="panel-header">Sculpting Tools</div>
                 <div class="panel-content">
                     <div class="tool-grid">
-                        <button class="active" onclick="setTool('mountain', this)">⛰️ Mountain</button>
-                        <button onclick="setTool('valley', this)">📉 Valley</button>
+                        <button class="active" onclick="setTool('mountain', this)">⛰️ Raise</button>
+                        <button onclick="setTool('valley', this)">📉 Lower</button>
                         <button onclick="setTool('flatten', this)">📐 Flatten</button>
                         <button onclick="setTool('smooth', this)">💨 Smooth</button>
-                        <button onclick="setTool('gps', this)">📍 GPS Probe</button>
-                        <button onclick="setTool('sun', this)">☀️ Move Sun</button>
-                        <button id="btn-walk" onclick="handleWalkButton(this)" style="grid-column: span 2;">🚶 Take a Walk</button>
-                        <button onclick="setTool('nav', this)" style="grid-column: span 2; background:#333; color:white;">✋ Navigate / Rotate</button>
+                        <button onclick="setTool('gps', this)">📍 GPS</button>
+                        <button onclick="setTool('sun', this)">☀️ Sun</button>
+                        <button id="btn-walk" onclick="handleWalkButton(this)" style="grid-column: span 2; border-color: #444;">🚶 First Person Walk</button>
+                        <button onclick="setTool('nav', this)" style="grid-column: span 2; background:#2a2a2a; color:#aaa;">✋ Orbit Navigation</button>
                     </div>
-                    <div class="control-group" style="margin-top:10px;">
+                    <div class="control-group" style="margin-top:15px;">
                         <label>Brush Size <span id="val-radius">25</span></label>
-                        <input type="range" id="inp-radius" min="5" max="60" value="25">
+                        <input type="range" id="inp-radius" min="5" max="80" value="25">
                     </div>
                     <div class="control-group">
                         <label>Intensity <span id="val-str">5</span></label>
@@ -121,37 +158,48 @@
                 </div>
             </div>
 
-            <!-- Atmosphere -->
-            <div class="panel">
-                <div class="panel-header">Atmosphere</div>
+            <!-- ATMOSPHERIC PERSPECTIVE -->
+            <div class="panel" style="border-color: var(--accent-color);">
+                <div class="panel-header" style="color:var(--accent-color)">Atmospheric Perspective</div>
                 <div class="panel-content">
+                    <div class="control-group">
+                        <label>Fog Density <span id="val-fog-dens">0.012</span></label>
+                        <input type="range" id="inp-fog-dens" min="0" max="0.04" step="0.001" value="0.012">
+                    </div>
+                    <div class="control-group">
+                        <label>Height Falloff <span id="val-fog-h">0.04</span></label>
+                        <input type="range" id="inp-fog-h" min="0.01" max="0.2" step="0.01" value="0.04">
+                        <small style="color:#666">Controls vertical thickness</small>
+                    </div>
+                     <div class="control-group">
+                        <div class="color-row">
+                            <label style="margin:0">Atmosphere Color</label>
+                            <input type="color" id="col-fog" value="#aaccff">
+                        </div>
+                    </div>
                     <div class="control-group">
                         <label>Ambient Light <span id="val-ambient">60%</span></label>
                         <input type="range" id="inp-ambient" min="0" max="1" step="0.05" value="0.6">
                     </div>
+                </div>
+            </div>
+
+            <!-- Biomes -->
+            <div class="panel">
+                <div class="panel-header">Biome Palette</div>
+                <div class="panel-content">
                     <div class="control-group">
                         <label>Water Level <span id="val-water">0m</span></label>
                         <input type="range" id="inp-water" min="-20" max="20" value="0">
                     </div>
                     <div class="control-group">
-                        <label>Fog Density <span id="val-fog">0.005</span></label>
-                        <input type="range" id="inp-fog" min="0" max="0.02" step="0.001" value="0.005">
-                    </div>
-                </div>
-            </div>
-
-            <!-- Shaders -->
-            <div class="panel">
-                <div class="panel-header">Biome Shaders</div>
-                <div class="panel-content">
-                    <div class="control-group">
-                        <label>Snow Level <span id="val-snow">45m</span></label>
+                        <label>Snow Line <span id="val-snow">45m</span></label>
                         <input type="range" id="sh-snow-h" min="10" max="80" value="45">
                     </div>
-                    <div class="control-group"><label>Grass Color</label><input type="color" id="col-grass" value="#416135"></div>
-                    <div class="control-group"><label>Rock Color</label><input type="color" id="col-rock" value="#5a4d41"></div>
-                    <div class="control-group"><label>Sand Color</label><input type="color" id="col-sand" value="#d4c79e"></div>
-                    <div class="control-group"><label>Water Color</label><input type="color" id="col-water" value="#006994"></div>
+                    <div class="color-row"><label>Grass</label><input type="color" id="col-grass" value="#416135"></div>
+                    <div class="color-row"><label>Rock</label><input type="color" id="col-rock" value="#5a4d41"></div>
+                    <div class="color-row"><label>Sand</label><input type="color" id="col-sand" value="#d4c79e"></div>
+                    <div class="color-row"><label>Water</label><input type="color" id="col-water" value="#005577"></div>
                 </div>
             </div>
 
@@ -161,19 +209,18 @@
                 <div class="panel-content">
                     <div class="control-group">
                         <label>Tree Density</label>
-                        <input type="range" id="inp-trees" min="0" max="5000" value="1000">
+                        <input type="range" id="inp-trees" min="0" max="8000" value="2000">
                     </div>
                     <div class="control-group">
-                        <label>Max Tree Height <span id="val-tree-h">5.0m</span></label>
-                        <input type="range" id="inp-tree-height" min="2.0" max="5.0" step="0.1" value="5.0">
-                        <small style="color:#777; font-size:0.75em;">Random interval: 2m to Max</small>
+                        <label>Max Height <span id="val-tree-h">5.0m</span></label>
+                        <input type="range" id="inp-tree-height" min="2.0" max="8.0" step="0.1" value="5.0">
                     </div>
                     <button onclick="scatterVegetation()">🌲 Regenerate Forest</button>
                 </div>
             </div>
 
-            <div class="panel">
-                <div class="panel-content">
+            <div class="panel" style="border:none; background:none; box-shadow:none;">
+                <div class="panel-content" style="padding:0">
                     <button class="primary" onclick="openExportModal()">Export Code...</button>
                 </div>
             </div>
@@ -184,9 +231,13 @@
     <!-- VIEWPORT -->
     <div id="viewport">
         <div id="overlay">
-            LMB: Action • RMB: Rotate • Scroll: Zoom<br>
-            <span id="tool-status" style="color:#aaa; font-size:0.9em">Tool: MOUNTAIN</span>
-            <div id="walk-help" style="display:none; color: var(--accent-color);">WASD to Move • Mouse to Look • ESC to Exit</div>
+            <div style="font-weight:bold; color:var(--accent-color); margin-bottom:5px;">CONTROLS</div>
+            LMB: Sculpt • RMB: Orbit • Scroll: Zoom<br>
+            <span id="tool-status" style="color:#aaa; font-size:0.9em; text-transform:uppercase;">Tool: MOUNTAIN</span>
+            <div id="walk-help" style="display:none; margin-top:10px; border-top:1px solid #444; padding-top:5px;">
+                <span style="color:#fff">WASD</span> Move • <span style="color:#fff">ESC</span> Exit<br>
+                <i style="color:#888; font-size:0.8em">Immersion Mode Active</i>
+            </div>
         </div>
         <div id="gps-tooltip">X: 0.0 Z: 0.0 H: 0.0m</div>
     </div>
@@ -196,13 +247,13 @@
         <div class="modal-box">
             <div class="modal-header">
                 <span style="color:#fff; font-weight:bold">Export Project Code</span>
-                <select id="export-mode" style="width: 220px; padding: 5px; background:#333; color:white; border:1px solid #555;" onchange="exportSystem()">
-                    <option value="full">Full Scene (Water+Lights)</option>
-                    <option value="geo_shader">Geometry + Shaders</option>
-                    <option value="geo_parts">Geometry with Named Parts</option>
-                    <option value="geo_only">Geometry Only</option>
-                </select>
-                <button onclick="document.getElementById('code-modal').style.display='none'" style="width:auto; padding:5px 15px; margin:0;">Close</button>
+                <div style="display:flex; gap:10px;">
+                    <select id="export-mode">
+                        <option value="full">Full Scene</option>
+                        <option value="geo">Geometry Data</option>
+                    </select>
+                    <button onclick="document.getElementById('code-modal').style.display='none'" style="width:auto; padding:5px 15px; margin:0; background:#333; border:1px solid #555;">Close</button>
+                </div>
             </div>
             <textarea id="code-output" readonly></textarea>
         </div>
@@ -222,8 +273,6 @@
         // ==========================================
         let scene, camera, renderer, controls, transformControl, walkControls;
         let terrainMesh, waterMesh, brushHelper, sunSphere, sunLight, sky, treesMesh;
-        
-        // Caches
         let pineGeometry = null;
 
         // Terrain Data
@@ -237,12 +286,11 @@
         const gpsTip = document.getElementById('gps-tooltip');
         const heightRaycaster = new THREE.Raycaster(); 
 
-        // Walk Mode Variables
+        // Walk Mode
         let isWalking = false;
         let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
         const velocity = new THREE.Vector3();
         const direction = new THREE.Vector3();
-        const walkSpeed = 30.0;
         let prevTime = performance.now();
 
         // Application State
@@ -251,30 +299,89 @@
             radius: 25,
             strength: 5,
             isDrawing: false,
+            
+            // Atmosphere State
             ambientIntensity: 0.6,
             waterLevel: 0,
             snowLevel: 45,
+            fogDensity: 0.012,
+            fogHeightFalloff: 0.04,
+            fogColor: new THREE.Color('#aaccff'),
+            
             flattenHeight: null,
             maxTreeHeight: 5.0,
+            
             colors: {
                 grass: new THREE.Color('#416135'),
                 rock: new THREE.Color('#5a4d41'),
                 sand: new THREE.Color('#d4c79e'),
-                water: new THREE.Color('#006994'),
+                water: new THREE.Color('#005577'),
                 snow: new THREE.Color('#ffffff')
-            }
+            },
+            
+            // To update custom uniforms in StandardMaterials
+            treeMaterial: null 
         };
 
         // ==========================================
-        // 2. SHADER DEFINITIONS
+        // 2. SHADER CHUNKS (ATMOSPHERIC SYSTEM)
+        // ==========================================
+        
+        // The shared GLSL logic for our custom atmospheric perspective
+        const atmosUniforms = `
+            uniform vec3 uFogColor;
+            uniform float uFogDensity;
+            uniform float uFogHeightFalloff;
+            uniform float uWaterLevel;
+        `;
+
+        // The math: Height Exponential Fog + Distance LUT (Blue Shift + Desaturation)
+        const atmosLogic = `
+            // 1. Calculate Distances
+            float dist = length(vPosition - cameraPosition);
+            float height = vWorldPosition.y; 
+
+            // 2. Exponential Height Fog Calculation
+            // We shift 'height' by water level so fog sits heavy on the lake
+            float heightFactor = exp(-uFogHeightFalloff * (height - uWaterLevel));
+            
+            // Combine distance and height. 
+            // Formula approximation: 1 - exp(-dist * density * heightDensity)
+            float fogFactor = 1.0 - exp( -dist * uFogDensity * heightFactor );
+            fogFactor = clamp(fogFactor, 0.0, 1.0);
+
+            // 3. LUT / Color Grading Simulation
+            // Desaturation based on distance (Atmospheric scattering scatters wavelengths, washing out color)
+            float satDist = smoothstep(20.0, 300.0, dist); // Start fading at 20m, fully washed at 300m
+            
+            // Luma coefs for accurate grayscale
+            vec3 gray = vec3(dot(finalColor, vec3(0.299, 0.587, 0.114)));
+            
+            // Mix original color with grayscale based on distance (30% max desaturation)
+            finalColor = mix(finalColor, gray, satDist * 0.4);
+
+            // Blue Shift: Distant objects look bluer due to Rayleigh scattering
+            vec3 blueTint = vec3(0.85, 0.92, 1.0); // Cool tint
+            finalColor = mix(finalColor, finalColor * blueTint, satDist * 0.5);
+
+            // 4. Final Fog Mix
+            // Mix the graded color with the dense fog color
+            finalColor = mix(finalColor, uFogColor, fogFactor);
+        `;
+
+        // ==========================================
+        // 3. SHADER DEFINITIONS
         // ==========================================
         const terrainVertexShader = `
             varying vec3 vNormal;
             varying vec3 vPosition;
+            varying vec3 vWorldPosition; // Needed for height fog
             varying float vSlope;
+            
             void main() {
                 vec4 worldPosition = modelMatrix * vec4(position, 1.0);
-                vPosition = worldPosition.xyz;
+                vWorldPosition = worldPosition.xyz;
+                vPosition = worldPosition.xyz; // View pos usually, but using World for consistency here
                 vNormal = normalize(mat3(modelMatrix) * normal);
                 vSlope = dot(vNormal, vec3(0.0, 1.0, 0.0));
                 gl_Position = projectionMatrix * viewMatrix * worldPosition;
@@ -293,42 +400,63 @@
             uniform vec3 uAmbientColor;
             uniform float uAmbientIntensity;
 
+            // ATMOSPHERE UNIFORMS
+            ${atmosUniforms}
+
             varying vec3 vNormal;
             varying vec3 vPosition;
+            varying vec3 vWorldPosition;
             varying float vSlope;
 
             float hash(vec2 p) { return fract(1e4 * sin(17.0 * p.x + p.y * 0.1) * (0.1 + abs(sin(p.y * 13.0 + p.x)))); }
 
             void main() {
-                float h = vPosition.y;
+                float h = vWorldPosition.y;
+                
+                // Lighting
                 float diff = max(dot(vNormal, uSunDirection), 0.0);
-                vec3 lighting = (uAmbientColor * uAmbientIntensity) + (uSunColor * diff * 1.2);
+                // Soften shadows in distance for fake ambient occlusion
+                vec3 lighting = (uAmbientColor * uAmbientIntensity) + (uSunColor * diff * 1.1);
 
+                // Texture Mixing
                 vec3 col = uColorGrass;
-                float rockNoise = hash(vPosition.xz * 0.1);
-                float rockFactor = smoothstep(0.7 + rockNoise*0.1, 0.4, vSlope);
+                
+                // Rock based on slope and noise
+                float rockNoise = hash(vWorldPosition.xz * 0.15);
+                float rockFactor = smoothstep(0.7 + rockNoise*0.1, 0.45, vSlope);
                 col = mix(col, uColorRock, rockFactor);
 
-                float sandFactor = 1.0 - smoothstep(uSandLevel, uSandLevel + 3.0, h);
+                // Sand
+                float sandFactor = 1.0 - smoothstep(uSandLevel, uSandLevel + 4.0, h);
                 col = mix(col, uColorSand, sandFactor);
 
+                // Snow
                 float snowHeight = uSnowLevel + (rockNoise * 5.0);
-                float snowFactor = smoothstep(snowHeight, snowHeight + 10.0, h);
-                snowFactor *= smoothstep(0.3, 0.6, vSlope);
+                float snowFactor = smoothstep(snowHeight, snowHeight + 8.0, h);
+                snowFactor *= smoothstep(0.4, 0.6, vSlope); // Don't stick to vertical cliffs
                 col = mix(col, uColorSnow, snowFactor);
 
-                gl_FragColor = vec4(col * lighting, 1.0);
+                vec3 finalColor = col * lighting;
+
+                // ATMOSPHERE LOGIC
+                ${atmosLogic}
+
+                gl_FragColor = vec4(finalColor, 1.0);
             }
         `;
 
         const waterVertexShader = `
             uniform float uTime;
             varying vec3 vPosition;
+            varying vec3 vWorldPosition;
             void main() {
                 vec3 pos = position;
-                float wave = sin(pos.x * 0.1 + uTime) * 0.5 + sin(pos.z * 0.08 + uTime * 0.8) * 0.5;
+                // Simple sine wave displacement
+                float wave = sin(pos.x * 0.15 + uTime) * 0.3 + sin(pos.z * 0.1 + uTime * 0.8) * 0.3;
                 pos.y += wave;
+                
                 vec4 worldPosition = modelMatrix * vec4(pos, 1.0);
+                vWorldPosition = worldPosition.xyz;
                 vPosition = worldPosition.xyz;
                 gl_Position = projectionMatrix * viewMatrix * worldPosition;
             }
@@ -338,53 +466,65 @@
             uniform vec3 uColorWater;
             uniform vec3 uSunDirection;
             uniform vec3 uSunColor;
+            
+            // ATMOSPHERE UNIFORMS
+            ${atmosUniforms}
+
             varying vec3 vPosition;
+            varying vec3 vWorldPosition;
+
             void main() {
                 vec3 viewVector = normalize(cameraPosition - vPosition);
-                vec3 normal = vec3(0.0, 1.0, 0.0);
+                vec3 normal = vec3(0.0, 1.0, 0.0); // Simplified normal for flat water
+                
+                // Specular
                 vec3 halfDir = normalize(uSunDirection + viewVector);
                 float spec = pow(max(dot(normal, halfDir), 0.0), 100.0);
-                vec3 col = uColorWater + (uSunColor * spec);
-                gl_FragColor = vec4(col, 0.85); 
+                
+                // Base Color + Specular
+                vec3 finalColor = uColorWater + (uSunColor * spec);
+
+                // ATMOSPHERE LOGIC
+                ${atmosLogic}
+                
+                // Water alpha usually constant, but let's fade it out at extreme distance to Sky
+                gl_FragColor = vec4(finalColor, 0.9); 
             }
         `;
 
         // ==========================================
-        // 3. GEOMETRY BUILDERS
+        // 4. GEOMETRY & MESHES
         // ==========================================
 
         function createElaboratePineGeometry() {
             if (pineGeometry) return pineGeometry;
-
             const geometries = [];
-
-            // 1. Trunk
-            const trunkGeo = new THREE.CylinderGeometry(0.15, 0.25, 1.5, 7);
+            
+            // Trunk
+            const trunkGeo = new THREE.CylinderGeometry(0.1, 0.3, 1.5, 6);
             trunkGeo.translate(0, 0.75, 0); 
             const trunkColor = new Float32Array(trunkGeo.attributes.position.count * 3);
-            const cTrunk = new THREE.Color('#5d4037'); 
+            const cTrunk = new THREE.Color('#3e2723'); 
             for(let i=0; i<trunkColor.length; i+=3) cTrunk.toArray(trunkColor, i);
             trunkGeo.setAttribute('color', new THREE.BufferAttribute(trunkColor, 3));
             geometries.push(trunkGeo);
 
-            // 2. Foliage Levels (Cones)
-            // Removed noise logic to keep geometry watertight (no gaps/tears)
-            const foliageColor = new THREE.Color('#386629'); 
+            // Foliage (Low Poly style cones)
+            const foliageColor = new THREE.Color('#2d4c1e'); 
             const createTier = (y, r, h) => {
-                // Ensure openEnded is false (default) for solid cones
-                const g = new THREE.ConeGeometry(r, h, 8, 1, false); 
+                const g = new THREE.ConeGeometry(r, h, 7, 1); 
                 g.translate(0, y + h/2, 0);
-                
                 const pos = g.attributes.position;
                 const cols = new Float32Array(pos.count * 3);
-                for(let i=0; i<cols.length; i+=3) foliageColor.toArray(cols, i);
+                const darkVar = new THREE.Color().copy(foliageColor).multiplyScalar(0.8 + Math.random()*0.4);
+                for(let i=0; i<cols.length; i+=3) darkVar.toArray(cols, i);
                 g.setAttribute('color', new THREE.BufferAttribute(cols, 3));
                 return g;
             };
 
-            geometries.push(createTier(1.0, 1.3, 1.5)); // Bottom
-            geometries.push(createTier(1.8, 1.0, 1.3)); // Mid
-            geometries.push(createTier(2.6, 0.6, 1.1)); // Top
+            geometries.push(createTier(1.0, 1.2, 1.5)); 
+            geometries.push(createTier(1.9, 0.9, 1.3)); 
+            geometries.push(createTier(2.7, 0.5, 1.0)); 
 
             pineGeometry = mergeGeometries(geometries);
             pineGeometry.computeVertexNormals(); 
@@ -413,7 +553,12 @@
                     uSunDirection: { value: new THREE.Vector3(0,1,0) },
                     uSunColor: { value: new THREE.Color(0xffffff) },
                     uAmbientColor: { value: new THREE.Color(0x404040) },
-                    uAmbientIntensity: { value: state.ambientIntensity }
+                    uAmbientIntensity: { value: state.ambientIntensity },
+                    // Atmos Uniforms
+                    uFogColor: { value: state.fogColor },
+                    uFogDensity: { value: state.fogDensity },
+                    uFogHeightFalloff: { value: state.fogHeightFalloff },
+                    uWaterLevel: { value: state.waterLevel }
                 },
                 vertexShader: terrainVertexShader,
                 fragmentShader: terrainFragmentShader,
@@ -428,14 +573,20 @@
 
         function createWaterMesh() {
             if(waterMesh) { scene.remove(waterMesh); waterMesh.geometry.dispose(); }
-            const waterGeo = new THREE.PlaneGeometry(WORLD_SIZE, WORLD_SIZE, 64, 64);
+            const waterGeo = new THREE.PlaneGeometry(WORLD_SIZE, WORLD_SIZE, 128, 128); // Higher res for waves
             waterGeo.rotateX(-Math.PI/2);
+            
             const waterMat = new THREE.ShaderMaterial({
                 uniforms: {
                     uTime: { value: 0 },
                     uColorWater: { value: state.colors.water },
                     uSunDirection: { value: new THREE.Vector3(0,1,0) },
-                    uSunColor: { value: new THREE.Color(0xffffff) }
+                    uSunColor: { value: new THREE.Color(0xffffff) },
+                    // Atmos Uniforms
+                    uFogColor: { value: state.fogColor },
+                    uFogDensity: { value: state.fogDensity },
+                    uFogHeightFalloff: { value: state.fogHeightFalloff },
+                    uWaterLevel: { value: state.waterLevel }
                 },
                 vertexShader: waterVertexShader,
                 fragmentShader: waterFragmentShader,
@@ -454,13 +605,101 @@
             
             const geom = createElaboratePineGeometry();
             
-            // Standard Material reacting to light
+            // CUSTOMIZING STANDARD MATERIAL FOR ATMOSPHERIC EFFECT
             const mat = new THREE.MeshStandardMaterial({ 
                 vertexColors: true, 
-                roughness: 0.7, 
+                roughness: 0.8, 
                 metalness: 0.1 
             });
             
+            // Hook into Three.js shader compilation to inject our fog logic
+            mat.onBeforeCompile = (shader) => {
+                // Add our uniforms
+                shader.uniforms.uFogColor = { value: state.fogColor };
+                shader.uniforms.uFogDensity = { value: state.fogDensity };
+                shader.uniforms.uFogHeightFalloff = { value: state.fogHeightFalloff };
+                shader.uniforms.uWaterLevel = { value: state.waterLevel };
+
+                state.treeMaterial = shader; // Save ref to update uniforms later
+
+                // Inject Uniform Defs
+                shader.fragmentShader = `
+                    uniform vec3 uFogColor;
+                    uniform float uFogDensity;
+                    uniform float uFogHeightFalloff;
+                    uniform float uWaterLevel;
+                    ${shader.fragmentShader}
+                `;
+
+                // Inject Logic at end of fragment shader (replacing standard fog)
+                // We use 'gl_FragColor' (standard in older three) or 'pc_fragColor' (newer). 
+                // Three.js chunk system is safer by replacing specific chunks.
+                
+                // Replace the end of the shader to apply our mix
+                // Standard materials usually use #include <fog_fragment>
+                shader.fragmentShader = shader.fragmentShader.replace(
+                    '#include <fog_fragment>',
+                    `
+                    // Custom Atmosphere Logic injected into Standard Material
+                    // vViewPosition is available in Standard Material (View Space)
+                    // We need World Position. MeshStandardMaterial calculates vWorldPosition if needed, 
+                    // but simplest way here is to reconstruct dist from ViewPosition.
+                    
+                    // Actually, let's stick to a robust approximation using gl_FragCoord depth? 
+                    // No, let's use the provided varying vWorldPosition if available, or make one.
+                    // Standard shader does have vWorldPosition inside vertex shader... let's enable it.
+                    `
+                );
+                
+                // Let's force vWorldPosition in vertex shader
+                shader.vertexShader = shader.vertexShader.replace(
+                    '#include <common>',
+                    `#include <common>
+                     varying vec3 vWorldPositionCustom;`
+                );
+                shader.vertexShader = shader.vertexShader.replace(
+                    '#include <worldpos_vertex>',
+                    `#include <worldpos_vertex>
+                     vWorldPositionCustom = (modelMatrix * vec4( transformed, 1.0 )).xyz;`
+                );
+
+                // Now use it in Fragment
+                shader.fragmentShader = shader.fragmentShader.replace(
+                    '#include <common>',
+                    `#include <common>
+                     varying vec3 vWorldPositionCustom;`
+                );
+
+                // Actual blending logic replacing standard fog
+                shader.fragmentShader = shader.fragmentShader.replace(
+                    '#include <fog_fragment>',
+                    `
+                    vec3 finalColor = gl_FragColor.rgb;
+                    
+                    // Re-use our logic variable names
+                    vec3 vPosition = vWorldPositionCustom;
+                    
+                    // 1. Dist / Height
+                    float dist = length(vPosition - cameraPosition);
+                    float height = vPosition.y;
+                    
+                    float heightFactor = exp(-uFogHeightFalloff * (height - uWaterLevel));
+                    float fogFactor = 1.0 - exp( -dist * uFogDensity * heightFactor );
+                    fogFactor = clamp(fogFactor, 0.0, 1.0);
+
+                    // 2. Grading
+                    float satDist = smoothstep(20.0, 300.0, dist);
+                    vec3 gray = vec3(dot(finalColor, vec3(0.299, 0.587, 0.114)));
+                    finalColor = mix(finalColor, gray, satDist * 0.4);
+                    vec3 blueTint = vec3(0.85, 0.92, 1.0);
+                    finalColor = mix(finalColor, finalColor * blueTint, satDist * 0.5);
+
+                    // 3. Mix
+                    gl_FragColor.rgb = mix(finalColor, uFogColor, fogFactor);
+                    `
+                );
+            };
+
             treesMesh = new THREE.InstancedMesh(geom, mat, count);
             treesMesh.castShadow = true;
             treesMesh.receiveShadow = true;
@@ -469,11 +708,9 @@
             const posAttr = terrainMesh.geometry.attributes.position;
             const normAttr = terrainMesh.geometry.attributes.normal;
             
-            // Base height of our geometry is roughly 3.7 units
-            const baseGeoHeight = 3.7; 
-
             let placed = 0;
-            for(let i=0; i<count * 3; i++) {
+            // Attempt placement more times than count to find valid spots
+            for(let i=0; i<count * 4; i++) {
                 if (placed >= count) break;
                 const rx = Math.floor(Math.random() * SEGMENTS);
                 const rz = Math.floor(Math.random() * SEGMENTS);
@@ -482,16 +719,17 @@
                 const y = posAttr.getY(idx);
                 const ny = normAttr.getY(idx);
                 
+                // Only place on land, below snow, and flat-ish ground
                 if (y > state.waterLevel + 1 && y < state.snowLevel - 5) {
-                    if (ny > 0.8) {
+                    if (ny > 0.75) {
                         const x = posAttr.getX(idx);
                         const z = posAttr.getZ(idx);
                         
                         dummy.position.set(x, y, z);
                         
-                        // Random height between 2m and Max Slider Value
+                        // Variation
                         const targetHeight = 2.0 + Math.random() * (state.maxTreeHeight - 2.0);
-                        const scaleY = targetHeight / baseGeoHeight;
+                        const scaleY = targetHeight / 3.5; // Base height roughly 3.5
                         const scaleXZ = scaleY * (0.8 + Math.random() * 0.4);
 
                         dummy.scale.set(scaleXZ, scaleY, scaleXZ);
@@ -544,34 +782,23 @@
         }
 
         // ==========================================
-        // 4. LOGIC & EVENTS
+        // 5. INTERACTION LOGIC
         // ==========================================
 
         function updateSunLogic() {
-            // Update light position
             sunLight.position.copy(sunSphere.position);
-            
-            // Critical: Ensure DirectionalLight always points to center to cast shadows on trees
             sunLight.target.position.set(0, 0, 0);
             sunLight.target.updateMatrixWorld();
 
-            // Update Sky Shader
             const uniforms = sky.material.uniforms;
             uniforms['sunPosition'].value.copy(sunSphere.position);
             
-            // Update Terrain/Water Shaders
             const sunDir = sunSphere.position.clone().normalize();
             terrainMesh.material.uniforms.uSunDirection.value.copy(sunDir);
             waterMesh.material.uniforms.uSunDirection.value.copy(sunDir);
-            
-            if(scene.fog) {
-                if(sunSphere.position.y < 0) scene.fog.color.set(0x050510);
-                else scene.fog.color.set(0xcceeff);
-            }
         }
 
         function updateShadowCamera() {
-            // Ensure shadow camera covers the whole world
             sunLight.shadow.camera.left = -WORLD_SIZE/2 - 50;
             sunLight.shadow.camera.right = WORLD_SIZE/2 + 50;
             sunLight.shadow.camera.top = WORLD_SIZE/2 + 50;
@@ -628,6 +855,7 @@
             if (intersects.length > 0) {
                 const pt = intersects[0].point;
                 brushHelper.position.copy(pt);
+                // Keep brush above water for visibility
                 brushHelper.position.y = Math.max(pt.y + 1, state.waterLevel + 1);
                 brushHelper.scale.set(state.radius, state.radius, state.radius);
                 brushHelper.visible = true;
@@ -725,7 +953,7 @@
         }
 
         // ==========================================
-        // 5. WALK MODE
+        // 6. WALK MODE
         // ==========================================
         
         function enterWalkMode(startPos) {
@@ -734,9 +962,13 @@
             camera.position.set(startPos.x, startPos.y + 1.75, startPos.z);
             walkControls.lock();
             const btn = document.getElementById('btn-walk');
-            btn.innerText = "Back to God view";
+            btn.innerText = "Exit Walk Mode (ESC)";
             btn.classList.add('active');
             document.getElementById('walk-help').style.display = "block";
+            
+            // Adjust Fog for Immersion
+            // When walking, we might want fog to feel closer/denser?
+            // For now keeping it consistent with god view for "Scale" feel.
         }
         
         function exitWalkMode() {
@@ -746,13 +978,13 @@
             camera.lookAt(0,0,0);
             controls.enabled = true;
             const btn = document.getElementById('btn-walk');
-            btn.innerText = "🚶 Take a Walk";
+            btn.innerText = "🚶 First Person Walk";
             btn.classList.remove('active');
             document.getElementById('walk-help').style.display = "none";
         }
 
         // ==========================================
-        // 6. MAIN LOOP & INIT
+        // 7. MAIN LOOP & INIT
         // ==========================================
 
         function animate() {
@@ -773,15 +1005,18 @@
                 walkControls.moveRight(-velocity.x * delta);
                 walkControls.moveForward(-velocity.z * delta);
 
-                heightRaycaster.set(camera.position, new THREE.Vector3(0, -1, 0));
+                // Gravity / Terrain following
                 const rayOrigin = camera.position.clone(); rayOrigin.y = 500; 
                 heightRaycaster.set(rayOrigin, new THREE.Vector3(0, -1, 0));
-                
                 const hits = heightRaycaster.intersectObject(terrainMesh);
-                if (hits.length > 0) camera.position.y = hits[0].point.y + 1.75;
+                if (hits.length > 0) {
+                    const h = Math.max(hits[0].point.y, state.waterLevel);
+                    camera.position.y = h + 1.8;
+                }
             }
 
             if(transformControl.dragging) updateSunLogic();
+            
             waterMesh.material.uniforms.uTime.value = time * 0.001;
             if(!isWalking) controls.update(); 
             renderer.render(scene, camera);
@@ -800,17 +1035,19 @@
             renderer.shadowMap.enabled = true;
             renderer.shadowMap.type = THREE.PCFSoftShadowMap;
             renderer.toneMapping = THREE.ACESFilmicToneMapping;
-            renderer.toneMappingExposure = 0.8;
+            renderer.toneMappingExposure = 1.0;
             container.appendChild(renderer.domElement);
 
             controls = new OrbitControls(camera, renderer.domElement);
             controls.enableDamping = true;
-            controls.maxPolarAngle = Math.PI / 2 - 0.02;
-            controls.mouseButtons.LEFT = null;
+            controls.maxPolarAngle = Math.PI / 2 - 0.05;
+            controls.minDistance = 20;
+            controls.maxDistance = 600;
 
             walkControls = new PointerLockControls(camera, document.body);
             walkControls.addEventListener('unlock', function () { if(isWalking) exitWalkMode(); });
 
+            // Keyboard Listeners
             const onKeyDown = function (event) {
                 switch (event.code) {
                     case 'ArrowUp': case 'KeyW': moveForward = true; break;
@@ -830,25 +1067,32 @@
             document.addEventListener('keydown', onKeyDown);
             document.addEventListener('keyup', onKeyUp);
 
-            scene.fog = new THREE.FogExp2(0xcceeff, 0.005);
+            // Setup Sky (Background)
             sky = new Sky();
             sky.scale.setScalar(450000);
+            const skyUniforms = sky.material.uniforms;
+            skyUniforms['turbidity'].value = 10;
+            skyUniforms['rayleigh'].value = 2;
+            skyUniforms['mieCoefficient'].value = 0.005;
+            skyUniforms['mieDirectionalG'].value = 0.8;
             scene.add(sky);
 
+            // Sun Object
             const sunGeo = new THREE.SphereGeometry(10, 16, 16);
-            const sunMat = new THREE.MeshBasicMaterial({ color: 0xffffaa });
+            const sunMat = new THREE.MeshBasicMaterial({ color: 0xffffdd });
             sunSphere = new THREE.Mesh(sunGeo, sunMat);
-            sunSphere.position.set(100, 200, 100);
+            sunSphere.position.set(100, 150, 100);
             scene.add(sunSphere);
 
-            // Sun Light
-            sunLight = new THREE.DirectionalLight(0xffffff, 2.5); 
+            // Lighting
+            sunLight = new THREE.DirectionalLight(0xffffff, 2.0); 
             sunLight.castShadow = true;
             sunLight.shadow.mapSize.width = 2048;
             sunLight.shadow.mapSize.height = 2048;
             scene.add(sunLight);
             scene.add(sunLight.target); 
 
+            // Transform Control
             transformControl = new TransformControls(camera, renderer.domElement);
             transformControl.addEventListener('dragging-changed', function (event) { controls.enabled = !event.value; });
             transformControl.attach(sunSphere);
@@ -859,11 +1103,13 @@
             createTerrainMesh();
             createWaterMesh();
 
+            // Brush Visualizer
             const bGeo = new THREE.RingGeometry(0.5, 1, 32);
             bGeo.rotateX(-Math.PI/2);
-            brushHelper = new THREE.Mesh(bGeo, new THREE.MeshBasicMaterial({ color: 0xff0000, transparent:true, opacity:0.5 }));
+            brushHelper = new THREE.Mesh(bGeo, new THREE.MeshBasicMaterial({ color: 0x64ffda, transparent:true, opacity:0.5, side:THREE.DoubleSide }));
             scene.add(brushHelper);
 
+            // Event Listeners
             container.addEventListener('pointermove', onPointerMove);
             container.addEventListener('pointerdown', onPointerDown);
             container.addEventListener('pointerup', onPointerUp);
@@ -877,8 +1123,36 @@
         }
 
         // ==========================================
-        // 7. UI HANDLERS
+        // 8. UI HANDLING & ATMOSPHERE UPDATES
         // ==========================================
+
+        // Function to update atmosphere variables across all shaders
+        function updateAtmosphere() {
+            // Update Terrain
+            if(terrainMesh) {
+                const u = terrainMesh.material.uniforms;
+                u.uFogDensity.value = state.fogDensity;
+                u.uFogHeightFalloff.value = state.fogHeightFalloff;
+                u.uFogColor.value = state.fogColor;
+                u.uWaterLevel.value = state.waterLevel;
+            }
+            // Update Water
+            if(waterMesh) {
+                const u = waterMesh.material.uniforms;
+                u.uFogDensity.value = state.fogDensity;
+                u.uFogHeightFalloff.value = state.fogHeightFalloff;
+                u.uFogColor.value = state.fogColor;
+                u.uWaterLevel.value = state.waterLevel;
+            }
+            // Update Trees (Standard Material Injection)
+            if(state.treeMaterial && state.treeMaterial.uniforms) {
+                const u = state.treeMaterial.uniforms;
+                if(u.uFogDensity) u.uFogDensity.value = state.fogDensity;
+                if(u.uFogHeightFalloff) u.uFogHeightFalloff.value = state.fogHeightFalloff;
+                if(u.uFogColor) u.uFogColor.value = state.fogColor;
+                if(u.uWaterLevel) u.uWaterLevel.value = state.waterLevel;
+            }
+        }
 
         window.setTool = (t, el) => {
             if(isWalking) return;
@@ -903,6 +1177,7 @@
             if (t !== 'gps') document.getElementById('gps-tooltip').style.display = 'none';
         };
 
+        const walkSpeed = 30.0;
         window.handleWalkButton = (el) => {
             if (isWalking) exitWalkMode();
             else window.setTool('walk', el);
@@ -912,33 +1187,47 @@
         window.openExportModal = () => { document.getElementById('code-modal').style.display='flex'; window.exportSystem(); };
 
         window.exportSystem = function() {
-            const mode = document.getElementById('export-mode').value;
-            const heights = Array.from(heightData).map(x=>x.toFixed(2)).join(',');
-            document.getElementById('code-output').value = "// Code export ready. Logic matches current scene setup.";
+            document.getElementById('code-output').value = "// TerrainShader Pro v6 Export\n// Includes Atmosphere Logic\n\nconst heightData = [" + Array.from(heightData.slice(0,50)).map(x=>x.toFixed(1)).join(',') + "...];";
         };
 
         function initUI() {
             const bindVal = (id, suffix, cb) => {
                 const el = document.getElementById(id);
                 el.addEventListener('input', e => {
-                    const v = e.target.value;
+                    const v = parseFloat(e.target.value);
                     const dispId = id.replace('inp','val').replace('sh','val');
                     const disp = document.getElementById(dispId);
                     if(disp) disp.innerText = v + suffix;
-                    if(cb) cb(parseFloat(v));
+                    if(cb) cb(v);
                 });
             };
 
+            // World
             bindVal('inp-size', 'm', (v) => { WORLD_SIZE = v; createTerrainMesh(); createWaterMesh(); updateShadowCamera(); scatterVegetation(); });
             bindVal('inp-res', '', (v) => { SEGMENTS = v; createTerrainMesh(); scatterVegetation(); });
+            
+            // Tools
             bindVal('inp-radius', '', (v) => state.radius = v);
             bindVal('inp-str', '', (v) => state.strength = v);
+            
+            // Atmosphere
+            bindVal('inp-fog-dens', '', (v) => { state.fogDensity = v; updateAtmosphere(); });
+            bindVal('inp-fog-h', '', (v) => { state.fogHeightFalloff = v; updateAtmosphere(); });
+            document.getElementById('col-fog').addEventListener('input', e => { state.fogColor.set(e.target.value); updateAtmosphere(); });
             bindVal('inp-ambient', '', (v) => { state.ambientIntensity = v; terrainMesh.material.uniforms.uAmbientIntensity.value = v; });
-            bindVal('inp-water', 'm', (v) => { state.waterLevel = v; waterMesh.position.y = v; terrainMesh.material.uniforms.uSandLevel.value = v+2.0; updateVegetationY(); });
-            bindVal('inp-fog', '', (v) => scene.fog.density = v);
+
+            // Biomes
+            bindVal('inp-water', 'm', (v) => { 
+                state.waterLevel = v; 
+                waterMesh.position.y = v; 
+                terrainMesh.material.uniforms.uSandLevel.value = v+2.0; 
+                updateVegetationY(); 
+                updateAtmosphere(); // Fog interacts with water level
+            });
             bindVal('sh-snow-h', 'm', (v) => { state.snowLevel = v; terrainMesh.material.uniforms.uSnowLevel.value = v; });
             bindVal('inp-tree-height', 'm', (v) => { state.maxTreeHeight = v; scatterVegetation(); });
 
+            // Colors
             const bindColor = (id, u) => {
                  document.getElementById(id).addEventListener('input', e => terrainMesh.material.uniforms[u].value.set(e.target.value));
             };
