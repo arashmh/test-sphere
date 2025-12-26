@@ -3,74 +3,64 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Golden Aetherial Vortex</title>
+    <title>The Living Plasma Vortex</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; }
         canvas { display: block; }
         #loading {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            color: #FFD700; font-family: monospace; font-size: 1.2rem; pointer-events: none;
+            position: absolute; top: 50%; left: 50%; 
+            transform: translate(-50%, -50%); 
+            color: #d4af37; font-family: sans-serif; 
+            font-size: 14px; letter-spacing: 2px;
+            pointer-events: none;
         }
     </style>
-    <!-- Import Maps for Three.js and Addons -->
+</head>
+<body>
+    <div id="loading">GENERATING PLASMA...</div>
+    
+    <!-- Import Three.js from CDN -->
     <script type="importmap">
         {
             "imports": {
-                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
             }
         }
     </script>
-</head>
-<body>
-    <div id="loading">Initializing Aetherial Field...</div>
-    
+
     <script type="module">
         import * as THREE from 'three';
-        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
-        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
-        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-        import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
-        import { Reflector } from 'three/addons/objects/Reflector.js';
 
-        // --- GLOBAL VARIABLES ---
-        let scene, camera, renderer, composer, controls;
-        let vortexMesh, particleSystem, floorMirror;
-        let clock = new THREE.Clock();
-
-        // --- CONFIGURATION OBJECT ---
-        const params = {
-            bulbRadius: 1.8,
-            stemThickness: 0.15,
-            twistFactor: 4.0,
-            displacementStrength: 0.15,
-            coreColor: '#ff4500', 
-            midColor: '#ffd700', 
-            rimColor: '#88ccff', 
-            opacity: 0.6,
-            bloomThreshold: 0.1,
-            bloomStrength: 2.5,
-            bloomRadius: 0.8,
-            rotationSpeed: 0.5,
-            flowSpeed: 1.2,
-            turbulence: 1.5,
-            pulseRate: 2.0,
-            particleCount: 2000,
-            particleSize: 4.0,
-            chaos: 0.5
+        // --- CONFIGURATION ---
+        const CONFIG = {
+            twistSpeed: 0.8,
+            riseSpeed: 0.4,
+            plasmaScale: 2.5,
+            shellPulseSpeed: 1.2
         };
 
-        // --- SHADERS ---
+        // --- SCENE SETUP ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x000000); // Pitch black background
+        scene.fog = new THREE.FogExp2(0x000000, 0.02);
 
-        // 1. Corrected Noise Chunk (Ashima Simplex 3D)
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+        camera.position.set(0, 4, 11);
+        camera.lookAt(0, 3.5, 0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Optimize for high DPI
+        document.body.appendChild(renderer.domElement);
+
+        // --- COMMON GLSL UTILS (Noise) ---
+        // We inject this into our shaders to create organic patterns without textures
         const noiseChunk = `
-            vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
-            vec4 mod289(vec4 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
-            vec4 permute(vec4 x) { return mod289(((x*34.0)+1.0)*x); }
-            vec4 taylorInvSqrt(vec4 r) { return 1.79284291400159 - 0.85373472095314 * r; }
+            // Simplex 3D Noise 
+            vec4 permute(vec4 x){return mod(((x*34.0)+1.0)*x, 289.0);}
+            vec4 taylorInvSqrt(vec4 r){return 1.79284291400159 - 0.85373472095314 * r;}
 
-            float snoise(vec3 v) { 
+            float snoise(vec3 v){ 
                 const vec2  C = vec2(1.0/6.0, 1.0/3.0) ;
                 const vec4  D = vec4(0.0, 0.5, 1.0, 2.0);
 
@@ -84,27 +74,23 @@
                 vec3 i1 = min( g.xyz, l.zxy );
                 vec3 i2 = max( g.xyz, l.zxy );
 
-                //   x0 = x0 - 0.0 + 0.0 * C.xxx;
-                //   x1 = x0 - i1  + 1.0 * C.xxx;
-                //   x2 = x0 - i2  + 2.0 * C.xxx;
-                //   x3 = x0 - 1.0 + 3.0 * C.xxx;
-                vec3 x1 = x0 - i1 + C.xxx;
-                vec3 x2 = x0 - i2 + C.yyy; // 2.0*C.x = 1/3 = C.y
-                vec3 x3 = x0 - D.yyy;      // -1.0+3.0*C.x = -0.5 = -D.y
+                //  x0 = x0 - 0.0 + 0.0 * C 
+                vec3 x1 = x0 - i1 + 1.0 * C.xxx;
+                vec3 x2 = x0 - i2 + 2.0 * C.xxx;
+                vec3 x3 = x0 - 1.0 + 3.0 * C.xxx;
 
                 // Permutations
-                i = mod289(i); 
+                i = mod(i, 289.0 ); 
                 vec4 p = permute( permute( permute( 
-                         i.z + vec4(0.0, i1.z, i2.z, 1.0 ))
-                       + i.y + vec4(0.0, i1.y, i2.y, 1.0 )) 
-                       + i.x + vec4(0.0, i1.x, i2.x, 1.0 ));
+                            i.z + vec4(0.0, i1.z, i2.z, 1.0 ))
+                          + i.y + vec4(0.0, i1.y, i2.y, 1.0 )) 
+                          + i.x + vec4(0.0, i1.x, i2.x, 1.0 ));
 
-                // Gradients: 7x7 points over a square, mapped onto an octahedron.
-                // The ring size 17*17 = 289 is close to a multiple of 49 (49*6 = 294)
-                float n_ = 0.142857142857; // 1.0/7.0
+                // Gradients
+                float n_ = 1.0/7.0; // N=7
                 vec3  ns = n_ * D.wyz - D.xzx;
 
-                vec4 j = p - 49.0 * floor(p * ns.z * ns.z);  //  mod(p,7*7)
+                vec4 j = p - 49.0 * floor(p * ns.z *ns.z);  //  mod(p,N*N)
 
                 vec4 x_ = floor(j * ns.z);
                 vec4 y_ = floor(j - 7.0 * x_ );    // mod(j,N)
@@ -116,8 +102,6 @@
                 vec4 b0 = vec4( x.xy, y.xy );
                 vec4 b1 = vec4( x.zw, y.zw );
 
-                //vec4 s0 = vec4(lessThan(b0,0.0))*2.0 - 1.0;
-                //vec4 s1 = vec4(lessThan(b1,0.0))*2.0 - 1.0;
                 vec4 s0 = floor(b0)*2.0 + 1.0;
                 vec4 s1 = floor(b1)*2.0 + 1.0;
                 vec4 sh = -step(h, vec4(0.0));
@@ -140,340 +124,290 @@
                 // Mix final noise value
                 vec4 m = max(0.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0);
                 m = m * m;
-                return 42.0 * dot( m*m, vec4( dot(p0,x0), dot(p1,x1), dot(p2,x2), dot(p3,x3) ) );
+                return 42.0 * dot( m*m, vec4( dot(p0,x0), dot(p1,x1), 
+                                              dot(p2,x2), dot(p3,x3) ) );
             }
         `;
 
-        // 2. Vortex Vertex Shader
-        const vortexVertexShader = `
-            uniform float uTime;
-            uniform float uBulbRadius;
-            uniform float uStemThickness;
-            uniform float uTwist;
-            uniform float uDisplacement;
-            uniform float uTurbulence;
-            
-            varying vec2 vUv;
-            varying vec3 vNormal;
-            varying vec3 vViewPosition;
-            varying float vNoise;
-            
-            ${noiseChunk}
+        // --- GEOMETRY GENERATION ---
+        // Create the Inverted Teardrop / Whirlwind shape
+        const points = [];
+        // Base flare
+        points.push(new THREE.Vector2(1.8, 0)); 
+        points.push(new THREE.Vector2(0.6, 0.4)); 
+        // Narrow twisted stem
+        points.push(new THREE.Vector2(0.2, 1.5)); 
+        points.push(new THREE.Vector2(0.25, 3.0)); 
+        // Bulbous top
+        points.push(new THREE.Vector2(1.8, 5.5)); 
+        points.push(new THREE.Vector2(1.4, 6.5)); 
+        points.push(new THREE.Vector2(0.6, 6.8)); 
+        // Closed top
+        points.push(new THREE.Vector2(0.0, 6.7)); // Close the loop at center
 
-            float getRadius(float y) {
-                float bulb = smoothstep(0.4, 1.0, y) * uBulbRadius;
-                float stem = (1.0 - smoothstep(0.0, 0.5, y)) * 1.5 + uStemThickness;
-                float baseFlare = smoothstep(0.1, 0.0, y) * 2.0;
-                float r = mix(stem, bulb, smoothstep(0.2, 0.7, y));
-                r += baseFlare; 
-                r *= (0.2 + 0.8 * smoothstep(0.2, 0.35, abs(y - 0.2)));
-                return max(0.1, r);
-            }
+        const geometryCurve = new THREE.SplineCurve(points);
+        // High segment count for smooth shader displacement
+        const baseGeometry = new THREE.LatheGeometry(geometryCurve.getPoints(80), 64);
+        
+        // --- 1. THE PLASMA CORE MATERIAL ---
+        const plasmaMaterial = new THREE.ShaderMaterial({
+            uniforms: {
+                uTime: { value: 0 },
+                uColorCore: { value: new THREE.Color(0xfffdb0) }, // Hot White/Yellow
+                uColorMid: { value: new THREE.Color(0xffaa00) },  // Gold/Orange
+                uColorEdge: { value: new THREE.Color(0xaa2200) }  // Deep Amber/Red
+            },
+            vertexShader: `
+                uniform float uTime;
+                varying vec2 vUv;
+                varying vec3 vPos;
+                varying float vElevation;
+                varying vec3 vViewPosition;
+                varying vec3 vNormal;
 
-            void main() {
-                vUv = uv;
+                ${noiseChunk}
+
+                void main() {
+                    vUv = uv;
+                    vNormal = normalize(normalMatrix * normal);
+                    
+                    // Base position
+                    vec3 pos = position;
+                    
+                    // --- GEOMETRIC TWIST ---
+                    // Twist the geometry based on height to create the spiral flow structure
+                    float twistAmt = 1.0 * pos.y; 
+                    float angle = twistAmt - uTime * 0.2; // Rotate slowly
+                    
+                    float s = sin(angle);
+                    float c = cos(angle);
+                    mat2 rot = mat2(c, -s, s, c);
+                    pos.xz = rot * pos.xz;
+
+                    // Add subtle waviness to geometry
+                    float wave = snoise(vec3(pos.x * 1.5, pos.y * 0.5 - uTime * 0.5, pos.z * 1.5));
+                    pos += normal * wave * 0.1;
+
+                    vPos = pos;
+                    vElevation = pos.y;
+                    
+                    vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+                    vViewPosition = -mvPosition.xyz;
+                    gl_Position = projectionMatrix * mvPosition;
+                }
+            `,
+            fragmentShader: `
+                uniform float uTime;
+                uniform vec3 uColorCore;
+                uniform vec3 uColorMid;
+                uniform vec3 uColorEdge;
                 
-                // Basic Shape
-                float r = getRadius(uv.y);
+                varying vec2 vUv;
+                varying vec3 vPos;
+                varying vec3 vNormal;
+                varying vec3 vViewPosition;
+
+                ${noiseChunk}
+
+                void main() {
+                    // Upward Flow coordinates
+                    vec3 flowPos = vPos * vec3(1.5, 0.8, 1.5);
+                    flowPos.y -= uTime * 1.2; // Move UP
+
+                    // --- VISCOUS FLUID SIMULATION ---
+                    // Layered noise to create "ribbons" of energy
+                    float n1 = snoise(flowPos);
+                    
+                    // Domain warping: distort the second noise layer with the first
+                    vec3 warp = flowPos + vec3(n1 * 0.5);
+                    float n2 = snoise(warp * 2.0 + vec3(0.0, uTime * 0.5, 0.0));
+                    
+                    // Create sharp ribbons
+                    float ribbon = sin(n2 * 10.0 + flowPos.y * 2.0); 
+                    ribbon = smoothstep(-0.2, 0.8, ribbon); // Sharpen contrast
+
+                    // --- COLOR MAPPING ---
+                    // Mix based on the ribbon intensity
+                    vec3 finalColor = mix(uColorEdge, uColorMid, ribbon);
+                    // Add hot core highlights
+                    float coreIntensity = smoothstep(0.6, 1.0, n2 + ribbon * 0.5);
+                    finalColor = mix(finalColor, uColorCore, coreIntensity);
+
+                    // --- VERTICAL GRADIENT ---
+                    // Hotter at base/stem, slightly cooling at top bulb
+                    float heightFactor = smoothstep(0.0, 7.0, vPos.y);
+                    finalColor *= mix(1.2, 0.8, heightFactor);
+
+                    // --- FAKE GLOW / OPACITY ---
+                    // Make edges softer, center brighter
+                    float opacity = 0.8 + 0.2 * ribbon;
+                    
+                    // Bottom fade out (fusion to ground)
+                    float groundFade = smoothstep(0.0, 0.5, vPos.y);
+                    
+                    gl_FragColor = vec4(finalColor * 1.5, opacity * groundFade);
+                }
+            `,
+            transparent: true,
+            blending: THREE.AdditiveBlending,
+            side: THREE.DoubleSide,
+            depthWrite: false // Disable depth write for internal glow effect
+        });
+
+        // --- 2. THE ALIVE SHELL MATERIAL ---
+        const shellMaterial = new THREE.ShaderMaterial({
+            uniforms: {
+                uTime: { value: 0 },
+                uColorRim: { value: new THREE.Color(0xaaccff) }, // Cool Blue/White
+            },
+            vertexShader: `
+                uniform float uTime;
+                varying vec3 vNormal;
+                varying vec3 vViewPosition;
+
+                ${noiseChunk}
+
+                void main() {
+                    vec3 pos = position;
+
+                    // "Breathing" displacement - organic ripple
+                    float breath = snoise(vec3(pos.x, pos.y * 0.5 + uTime * 0.5, pos.z));
+                    pos += normal * breath * 0.08; 
+
+                    vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+                    vViewPosition = -mvPosition.xyz;
+                    vNormal = normalize(normalMatrix * normal);
+                    gl_Position = projectionMatrix * mvPosition;
+                }
+            `,
+            fragmentShader: `
+                uniform vec3 uColorRim;
+                varying vec3 vNormal;
+                varying vec3 vViewPosition;
+
+                void main() {
+                    // Fresnel Effect for the Rim
+                    vec3 viewDir = normalize(vViewPosition);
+                    vec3 normal = normalize(vNormal);
+                    
+                    float fresnel = dot(viewDir, normal);
+                    fresnel = clamp(1.0 - fresnel, 0.0, 1.0);
+                    
+                    // Sharpen the rim
+                    float rim = pow(fresnel, 3.0); 
+
+                    // Transparency: Center is transparent, edges are glowing
+                    float alpha = rim * 0.8;
+
+                    // Tint the rim
+                    vec3 color = uColorRim * 2.0; // Boost intensity
+
+                    gl_FragColor = vec4(color, alpha);
+                }
+            `,
+            transparent: true,
+            blending: THREE.AdditiveBlending,
+            side: THREE.FrontSide,
+            depthWrite: false
+        });
+
+        // --- 3. FLOOR POOL GLOW (Fake Bloom for Base) ---
+        const floorGeometry = new THREE.PlaneGeometry(5, 5);
+        const floorMaterial = new THREE.ShaderMaterial({
+            uniforms: {
+                uTime: { value: 0 },
+                uColor: { value: new THREE.Color(0xffaa00) }
+            },
+            vertexShader: `
+                varying vec2 vUv;
+                void main() {
+                    vUv = uv;
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                uniform float uTime;
+                uniform vec3 uColor;
+                varying vec2 vUv;
                 
-                // Twist logic
-                float angle = uv.y * uTwist + uTime * 0.2;
-                float tx = position.x * cos(angle) - position.z * sin(angle);
-                float tz = position.x * sin(angle) + position.z * cos(angle);
-                
-                vec3 twistedPos = vec3(tx, position.y, tz);
-                vec2 xz = normalize(twistedPos.xz);
-                twistedPos.x = xz.x * r;
-                twistedPos.z = xz.y * r;
+                ${noiseChunk}
 
-                // Displacement
-                float noiseVal = snoise(vec3(twistedPos.x * uTurbulence, twistedPos.y * 2.0 - uTime, twistedPos.z * uTurbulence));
-                vNoise = noiseVal;
-                
-                vec3 displacedPos = twistedPos + normal * noiseVal * uDisplacement * (uv.y + 0.2);
+                void main() {
+                    vec2 uv = vUv - 0.5;
+                    float dist = length(uv) * 2.0;
+                    
+                    // Radial gradient fade
+                    float alpha = 1.0 - smoothstep(0.0, 1.0, dist);
+                    
+                    // Swirling noise in the pool
+                    float angle = atan(uv.y, uv.x);
+                    float noiseVal = snoise(vec3(uv * 5.0, uTime * 0.5));
+                    
+                    // Add spirals
+                    float spiral = sin(dist * 10.0 - uTime * 2.0 + angle * 2.0);
+                    
+                    vec3 color = uColor * (1.5 + spiral * 0.5);
+                    
+                    gl_FragColor = vec4(color, alpha * 0.6 * (1.0 + noiseVal * 0.2));
+                }
+            `,
+            transparent: true,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false
+        });
 
-                vec4 mvPosition = modelViewMatrix * vec4(displacedPos, 1.0);
-                vViewPosition = -mvPosition.xyz;
-                vNormal = normalMatrix * normal;
-                
-                gl_Position = projectionMatrix * mvPosition;
-            }
-        `;
+        // --- MESH ASSEMBLY ---
+        
+        // 1. The Core (Plasma)
+        const coreMesh = new THREE.Mesh(baseGeometry, plasmaMaterial);
+        scene.add(coreMesh);
 
-        // 3. Vortex Fragment Shader
-        const vortexFragmentShader = `
-            uniform vec3 uCoreColor;
-            uniform vec3 uMidColor;
-            uniform vec3 uRimColor;
-            uniform float uOpacity;
-            uniform float uTime;
-            uniform float uFlowSpeed;
-            
-            varying vec2 vUv;
-            varying vec3 vNormal;
-            varying vec3 vViewPosition;
-            varying float vNoise;
+        // 2. The Shell (Slightly larger copy)
+        // We scale it slightly in the Vertex Shader logic effectively, 
+        // but let's scale the mesh slightly here to ensure envelopment.
+        const shellMesh = new THREE.Mesh(baseGeometry.clone(), shellMaterial);
+        shellMesh.scale.set(1.05, 1.02, 1.05); 
+        scene.add(shellMesh);
 
-            void main() {
-                vec3 normal = normalize(vNormal);
-                vec3 viewDir = normalize(vViewPosition);
-                float dotNV = max(0.0, dot(normal, viewDir));
-                float fresnel = pow(1.0 - dotNV, 2.5);
+        // 3. The Floor Pool
+        const floorMesh = new THREE.Mesh(floorGeometry, floorMaterial);
+        floorMesh.rotation.x = -Math.PI / 2;
+        floorMesh.position.y = 0.05; // Just above 0 to avoid z-fighting if there was a floor
+        scene.add(floorMesh);
 
-                float flow = sin((vUv.y * 10.0) - (uTime * uFlowSpeed) + (vNoise * 2.0));
-                flow = smoothstep(0.0, 1.0, flow);
+        // Remove loading text
+        document.getElementById('loading').style.display = 'none';
 
-                vec3 baseColor = mix(uCoreColor, uMidColor, flow);
-                baseColor += vec3(1.0) * smoothstep(0.8, 1.0, flow + vNoise);
-
-                vec3 finalColor = mix(baseColor, uRimColor, fresnel * 0.8);
-                
-                float alpha = uOpacity * (fresnel + (flow * 0.5));
-                
-                gl_FragColor = vec4(finalColor, alpha);
-            }
-        `;
-
-        // 4. Particles Vertex Shader
-        const particleVertexShader = `
-            uniform float uTime;
-            uniform float uSpeed;
-            uniform float uTwist;
-            uniform float uBulbRadius;
-            uniform float uChaos;
-            uniform float uSize;
-            
-            attribute float aRandom;
-            attribute float aOffset;
-            
-            varying float vAlpha;
-
-            float getRadius(float y) {
-                 float bulb = smoothstep(0.4, 1.0, y) * uBulbRadius;
-                 float stem = (1.0 - smoothstep(0.0, 0.5, y)) * 1.5 + 0.1;
-                 return mix(stem, bulb, smoothstep(0.2, 0.7, y)) * 1.2;
-            }
-
-            void main() {
-                float life = mod(uTime * 0.2 + aOffset, 1.0);
-                float y = life; 
-                
-                float angle = y * uTwist * 2.0 + (uTime * uSpeed) + (aRandom * 6.28);
-                float r = getRadius(y) + (sin(uTime * 5.0 + aRandom * 10.0) * uChaos * 0.2);
-                
-                vec3 pos = vec3(0.0);
-                pos.x = cos(angle) * r;
-                pos.z = sin(angle) * r;
-                pos.y = y * 5.0; 
-
-                vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
-                gl_PointSize = uSize * (1.0 / -mvPosition.z);
-                vAlpha = smoothstep(0.0, 0.1, life) * (1.0 - smoothstep(0.8, 1.0, life));
-                
-                gl_Position = projectionMatrix * mvPosition;
-            }
-        `;
-
-        // 5. Particles Fragment Shader
-        const particleFragmentShader = `
-            uniform vec3 uColor;
-            varying float vAlpha;
-
-            void main() {
-                vec2 coord = gl_PointCoord - vec2(0.5);
-                float dist = length(coord);
-                if (dist > 0.5) discard;
-                float glow = 1.0 - (dist * 2.0);
-                glow = pow(glow, 2.0);
-                gl_FragColor = vec4(uColor, vAlpha * glow);
-            }
-        `;
-
-        function init() {
-            const container = document.body;
-            document.getElementById('loading').style.display = 'none';
-
-            // Scene Setup
-            scene = new THREE.Scene();
-            scene.fog = new THREE.FogExp2(0x000000, 0.02);
-
-            camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
-            camera.position.set(0, 3, 8);
-
-            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setPixelRatio(window.devicePixelRatio);
-            renderer.toneMapping = THREE.ReinhardToneMapping;
-            container.appendChild(renderer.domElement);
-
-            controls = new OrbitControls(camera, renderer.domElement);
-            controls.enableDamping = true;
-            controls.dampingFactor = 0.05;
-            controls.target.set(0, 2.5, 0);
-
-            // Vortex Mesh
-            const geometry = new THREE.CylinderGeometry(1, 1, 5, 64, 100, true);
-            geometry.translate(0, 2.5, 0); 
-
-            const material = new THREE.ShaderMaterial({
-                uniforms: {
-                    uTime: { value: 0 },
-                    uBulbRadius: { value: params.bulbRadius },
-                    uStemThickness: { value: params.stemThickness },
-                    uTwist: { value: params.twistFactor },
-                    uDisplacement: { value: params.displacementStrength },
-                    uTurbulence: { value: params.turbulence },
-                    uCoreColor: { value: new THREE.Color(params.coreColor) },
-                    uMidColor: { value: new THREE.Color(params.midColor) },
-                    uRimColor: { value: new THREE.Color(params.rimColor) },
-                    uOpacity: { value: params.opacity },
-                    uFlowSpeed: { value: params.flowSpeed }
-                },
-                vertexShader: vortexVertexShader,
-                fragmentShader: vortexFragmentShader,
-                transparent: true,
-                side: THREE.DoubleSide,
-                depthWrite: false,
-                blending: THREE.AdditiveBlending
-            });
-
-            vortexMesh = new THREE.Mesh(geometry, material);
-            scene.add(vortexMesh);
-
-            // Particle System
-            const pGeometry = new THREE.BufferGeometry();
-            const pCount = params.particleCount;
-            const pRandom = new Float32Array(pCount);
-            const pOffset = new Float32Array(pCount);
-
-            for(let i=0; i<pCount; i++) {
-                pRandom[i] = Math.random();
-                pOffset[i] = Math.random();
-            }
-
-            pGeometry.setAttribute('aRandom', new THREE.BufferAttribute(pRandom, 1));
-            pGeometry.setAttribute('aOffset', new THREE.BufferAttribute(pOffset, 1));
-
-            const pMaterial = new THREE.ShaderMaterial({
-                uniforms: {
-                    uTime: { value: 0 },
-                    uSpeed: { value: params.flowSpeed },
-                    uTwist: { value: params.twistFactor },
-                    uBulbRadius: { value: params.bulbRadius },
-                    uChaos: { value: params.chaos },
-                    uSize: { value: params.particleSize * renderer.getPixelRatio() },
-                    uColor: { value: new THREE.Color(params.midColor) }
-                },
-                vertexShader: particleVertexShader,
-                fragmentShader: particleFragmentShader,
-                transparent: true,
-                depthWrite: false,
-                blending: THREE.AdditiveBlending
-            });
-
-            particleSystem = new THREE.Points(pGeometry, pMaterial);
-            scene.add(particleSystem);
-
-            // Floor Reflection
-            const planeGeo = new THREE.PlaneGeometry(20, 20);
-            floorMirror = new Reflector(planeGeo, {
-                clipBias: 0.003,
-                textureWidth: window.innerWidth * window.devicePixelRatio,
-                textureHeight: window.innerHeight * window.devicePixelRatio,
-                color: 0x333333,
-            });
-            floorMirror.rotation.x = -Math.PI / 2;
-            scene.add(floorMirror);
-
-            // Post Processing
-            const renderScene = new RenderPass(scene, camera);
-            
-            const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
-            bloomPass.threshold = params.bloomThreshold;
-            bloomPass.strength = params.bloomStrength;
-            bloomPass.radius = params.bloomRadius;
-
-            composer = new EffectComposer(renderer);
-            composer.addPass(renderScene);
-            composer.addPass(bloomPass);
-
-            setupGUI(material, pMaterial, bloomPass);
-            window.addEventListener('resize', onWindowResize);
-        }
-
-        function setupGUI(meshMat, partMat, bloom) {
-            const gui = new GUI({ title: 'Vortex Control' });
-
-            const geoFolder = gui.addFolder('Geometry & Shape');
-            geoFolder.add(params, 'bulbRadius', 1.0, 3.0).onChange(v => {
-                meshMat.uniforms.uBulbRadius.value = v;
-                partMat.uniforms.uBulbRadius.value = v;
-            });
-            geoFolder.add(params, 'stemThickness', 0.05, 0.5).onChange(v => meshMat.uniforms.uStemThickness.value = v);
-            geoFolder.add(params, 'twistFactor', 0.0, 10.0).onChange(v => {
-                meshMat.uniforms.uTwist.value = v;
-                partMat.uniforms.uTwist.value = v;
-            });
-            geoFolder.add(params, 'displacementStrength', 0.0, 0.5).onChange(v => meshMat.uniforms.uDisplacement.value = v);
-
-            const visFolder = gui.addFolder('Visuals & Color');
-            visFolder.addColor(params, 'coreColor').onChange(v => meshMat.uniforms.uCoreColor.value.set(v));
-            visFolder.addColor(params, 'midColor').onChange(v => {
-                meshMat.uniforms.uMidColor.value.set(v);
-                partMat.uniforms.uColor.value.set(v);
-            });
-            visFolder.addColor(params, 'rimColor').onChange(v => meshMat.uniforms.uRimColor.value.set(v));
-            visFolder.add(params, 'opacity', 0.0, 1.0).onChange(v => meshMat.uniforms.uOpacity.value = v);
-            visFolder.add(params, 'bloomThreshold', 0.0, 1.0).onChange(v => bloom.threshold = v);
-            visFolder.add(params, 'bloomStrength', 0.0, 5.0).onChange(v => bloom.strength = v);
-
-            const animFolder = gui.addFolder('Animation');
-            animFolder.add(params, 'rotationSpeed', 0.0, 2.0);
-            animFolder.add(params, 'flowSpeed', 0.0, 5.0).onChange(v => {
-                meshMat.uniforms.uFlowSpeed.value = v;
-                partMat.uniforms.uSpeed.value = v;
-            });
-            animFolder.add(params, 'turbulence', 0.0, 5.0).onChange(v => meshMat.uniforms.uTurbulence.value = v);
-
-            const partFolder = gui.addFolder('Particles');
-            partFolder.add(params, 'particleSize', 1.0, 10.0).onChange(v => partMat.uniforms.uSize.value = v * renderer.getPixelRatio());
-            partFolder.add(params, 'chaos', 0.0, 2.0).onChange(v => partMat.uniforms.uChaos.value = v);
-        }
-
-        function onWindowResize() {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            composer.setSize(window.innerWidth, window.innerHeight);
-            if (floorMirror) {
-                floorMirror.getRenderTarget().setSize(
-                    window.innerWidth * window.devicePixelRatio,
-                    window.innerHeight * window.devicePixelRatio
-                );
-            }
-        }
+        // --- ANIMATION LOOP ---
+        const clock = new THREE.Clock();
 
         function animate() {
             requestAnimationFrame(animate);
-            
+
             const time = clock.getElapsedTime();
 
-            if (vortexMesh) {
-                vortexMesh.material.uniforms.uTime.value = time;
-                vortexMesh.rotation.y = time * params.rotationSpeed;
-            }
+            // Update Uniforms
+            plasmaMaterial.uniforms.uTime.value = time;
+            shellMaterial.uniforms.uTime.value = time;
+            floorMaterial.uniforms.uTime.value = time;
 
-            if (particleSystem) {
-                particleSystem.material.uniforms.uTime.value = time;
-                particleSystem.rotation.y = time * params.rotationSpeed;
-            }
+            // Slow camera drift for cinematic effect
+            camera.position.x = Math.sin(time * 0.1) * 2;
+            camera.position.z = 11 + Math.cos(time * 0.15) * 1;
+            camera.lookAt(0, 3.5, 0);
 
-            composer.render();
-            controls.update();
+            renderer.render(scene, camera);
         }
 
-        init();
         animate();
+
+        // --- RESIZE HANDLER ---
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
     </script>
 </body>
 </html>
