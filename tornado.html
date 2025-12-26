@@ -267,15 +267,81 @@
         renderer.setPixelRatio(window.devicePixelRatio);
         container.appendChild(renderer.domElement);
         
-        // Camera position
-        camera.position.set(0, 1, 4);
+        // Camera position - inside tornado at base of hemisphere cap
+        const capStartRatio = 0.7;
+        const capStartY = capStartRatio * 1.6 - 1.6 / 2;
+        camera.position.set(0, capStartY, 0);
         
-        // Orbit controls
-        const controls = new THREE.OrbitControls(camera, renderer.domElement);
-        controls.enableDamping = true;
-        controls.dampingFactor = 0.05;
-        controls.minDistance = 2;
-        controls.maxDistance = 10;
+        // Drag to look controls
+        let isDragging = false;
+        let previousMouseX = 0;
+        let previousMouseY = 0;
+        let rotationX = 0;
+        let rotationY = 0;
+        
+        document.addEventListener('mousedown', (event) => {
+            isDragging = true;
+            previousMouseX = event.clientX;
+            previousMouseY = event.clientY;
+        });
+        
+        document.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
+        
+        document.addEventListener('mousemove', (event) => {
+            if (!isDragging) return;
+            
+            const deltaX = event.clientX - previousMouseX;
+            const deltaY = event.clientY - previousMouseY;
+            
+            previousMouseX = event.clientX;
+            previousMouseY = event.clientY;
+            
+            rotationY += deltaX * 0.005; // Left/right rotation
+            rotationX += deltaY * 0.005; // Up/down rotation
+            
+            // Clamp vertical rotation to avoid flipping
+            rotationX = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, rotationX));
+        });
+        
+        // WASD movement controls
+        const keys = {};
+        const moveSpeed = 0.05;
+        
+        document.addEventListener('keydown', (event) => {
+            keys[event.key.toLowerCase()] = true;
+        });
+        
+        document.addEventListener('keyup', (event) => {
+            keys[event.key.toLowerCase()] = false;
+        });
+        
+        function updateMovement() {
+            const forward = new THREE.Vector3();
+            const right = new THREE.Vector3();
+            
+            // Get forward and right vectors based on camera rotation (horizontal only)
+            forward.set(-Math.sin(rotationY), 0, -Math.cos(rotationY));
+            right.set(Math.cos(rotationY), 0, -Math.sin(rotationY));
+            
+            if (keys['w']) {
+                camera.position.x += forward.x * moveSpeed;
+                camera.position.z += forward.z * moveSpeed;
+            }
+            if (keys['s']) {
+                camera.position.x -= forward.x * moveSpeed;
+                camera.position.z -= forward.z * moveSpeed;
+            }
+            if (keys['a']) {
+                camera.position.x -= right.x * moveSpeed;
+                camera.position.z -= right.z * moveSpeed;
+            }
+            if (keys['d']) {
+                camera.position.x += right.x * moveSpeed;
+                camera.position.z += right.z * moveSpeed;
+            }
+        }
         
         // Lighting
         let ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
@@ -519,8 +585,13 @@
             time += deltaTime * params.flowSpeed;
             
             updateThreads(deltaTime);
+            updateMovement();
             
-            controls.update();
+            // Update camera rotation based on drag
+            camera.rotation.order = 'YXZ';
+            camera.rotation.y = rotationY;
+            camera.rotation.x = rotationX;
+            
             composer.render();
         }
         
@@ -684,7 +755,14 @@
             
             ambientLight.intensity = params.ambient;
             bloomPass.strength = params.bloom;
-            camera.position.set(0, 1, 4);
+            
+            // Reset camera to inside position
+            const capStartRatio = 0.7;
+            const capStartY = capStartRatio * params.height - params.height / 2;
+            camera.position.set(0, capStartY, 0);
+            rotationX = 0;
+            rotationY = 0;
+            camera.rotation.set(0, 0, 0);
             
             // Update all displays
             updateDisplay('height', params.height.toFixed(1), 'm');
