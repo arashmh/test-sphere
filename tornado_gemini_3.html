@@ -39,17 +39,17 @@
         // --- CONFIG & STATE ---
         const params = {
             // Geometry
-            baseWidth: 1.8,
-            stemPinch: 0.2,
-            bulbWidth: 1.9,
-            bulbHeight: 6.5,
-            totalHeight: 7.0,
+            baseWidth: 4.0,
+            stemPinch: 0.3808,
+            bulbWidth: 1.0,
+            bulbHeight: 10.0,
+            totalHeight: 12.0,
             
             // Plasma
             coreColor: '#fffdb0',
             midColor: '#ffaa00',
             edgeColor: '#aa2200',
-            flowSpeed: 1.2,
+            flowSpeed: 0.051,
             twistSpeed: 0.2,
             twistStrength: 1.0,
             noiseScale: 1.0,
@@ -58,14 +58,14 @@
             
             // Shell
             rimColor: '#aaccff',
-            shellPulseSpeed: 0.5,
-            shellDisplacement: 0.08,
-            fresnelPower: 3.0,
-            shellOpacity: 0.8,
+            shellPulseSpeed: 0.0,
+            shellDisplacement: 0.2,
+            fresnelPower: 5.0,
+            shellOpacity: 1.0,
             
             // Floor
-            poolSize: 1.0,
-            poolColor: '#ffaa00'
+            poolSize: 3.0,
+            poolColor: '#00e1ff'
         };
 
         // --- SCENE SETUP ---
@@ -315,6 +315,7 @@
         const floorMesh = new THREE.Mesh(floorGeometry, floorMaterial);
         floorMesh.rotation.x = -Math.PI / 2;
         floorMesh.position.y = 0.05;
+        floorMesh.scale.set(params.poolSize, params.poolSize, params.poolSize);
         scene.add(floorMesh);
 
         // --- GUI ---
