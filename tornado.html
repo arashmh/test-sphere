@@ -212,6 +212,9 @@
             
             <label>Pulse Intensity <span class="value-display" id="pulseValue">0.3</span></label>
             <input type="range" id="pulse" min="0" max="1" step="0.05" value="0.3">
+            
+            <label>Cap Animation <span class="value-display" id="capAnimationValue">Fixed</span></label>
+            <input type="range" id="capAnimation" min="0" max="1" step="1" value="0">
         </div>
         
         <div class="control-group">
@@ -292,6 +295,7 @@
             flowSpeed: 0.5,
             turbulence: 0.15,
             pulse: 0.3,
+            capAnimation: 0,
             coreColor: new THREE.Color(0xff6600),
             midColor: new THREE.Color(0xffaa00),
             outerColor: new THREE.Color(0x00ccff),
@@ -324,7 +328,13 @@
                 const angle = (i / params.threadCount) * Math.PI * 2;
                 const points = [];
                 
-                for (let j = 0; j <= params.segments; j++) {
+                // Calculate how many segments for the main tornado body vs hemisphere cap
+                const capStartRatio = 0.7; // Cap starts at 70% height
+                const bodySegments = Math.floor(params.segments * capStartRatio);
+                const capSegments = params.segments - bodySegments;
+                
+                // Main tornado body
+                for (let j = 0; j <= bodySegments; j++) {
                     const t = j / params.segments;
                     const y = t * params.height - params.height / 2;
                     const radius = params.baseRadius + (params.topRadius - params.baseRadius) * t;
@@ -335,6 +345,34 @@
                     // Add some randomness for organic feel
                     const noise = Math.sin(i * 0.5 + j * 0.1) * 0.05;
                     const radiusWithNoise = radius * (1 + noise);
+                    
+                    const x = Math.cos(spiralAngle) * radiusWithNoise;
+                    const z = Math.sin(spiralAngle) * radiusWithNoise;
+                    
+                    points.push(new THREE.Vector3(x, y, z));
+                }
+                
+                // Hemisphere cap
+                // Ensure neck stays open by starting from the top radius (not closing)
+                const capStartT = bodySegments / params.segments;
+                const capStartY = capStartT * params.height - params.height / 2;
+                const neckRadius = params.baseRadius + (params.topRadius - params.baseRadius) * capStartT;
+                
+                for (let j = 1; j <= capSegments; j++) {
+                    const capT = j / capSegments;
+                    // Use asin to create hemisphere that starts at neckRadius and curves inward
+                    const phi = Math.asin(capT); // 0 to π/2, maps more area at base
+                    
+                    // Radius decreases from neckRadius to 0 at top, but keeps neck open
+                    const localRadius = neckRadius * Math.cos(phi);
+                    const y = capStartY + neckRadius * Math.sin(phi);
+                    
+                    // Continue the spiral into the cap
+                    const t = (bodySegments + j) / params.segments;
+                    const spiralAngle = angle + t * params.twist;
+                    
+                    const noise = Math.sin(i * 0.5 + (bodySegments + j) * 0.1) * 0.05;
+                    const radiusWithNoise = localRadius * (1 + noise);
                     
                     const x = Math.cos(spiralAngle) * radiusWithNoise;
                     const z = Math.sin(spiralAngle) * radiusWithNoise;
@@ -383,31 +421,74 @@
                 const positions = thread.geometry.attributes.position.array;
                 const colors = thread.geometry.attributes.color.array;
                 
+                const capStartRatio = 0.7;
+                const bodySegments = Math.floor(params.segments * capStartRatio);
+                const capSegments = params.segments - bodySegments;
+                const capStartT = bodySegments / params.segments;
+                const capStartY = capStartT * params.height - params.height / 2;
+                const neckRadius = params.baseRadius + (params.topRadius - params.baseRadius) * capStartT;
+                
                 for (let i = 0; i <= params.segments; i++) {
                     const idx = i * 3;
                     const t = i / params.segments;
-                    const y = t * params.height - params.height / 2;
-                    const radius = params.baseRadius + (params.topRadius - params.baseRadius) * t;
                     
                     // Base angle for this thread
                     const baseAngle = (threadIdx / params.threadCount) * Math.PI * 2;
-                    // Add upward flow animation to the spiral angle
-                    const spiralAngle = baseAngle + t * params.twist - time * params.flowSpeed;
-                    const rotationAngle = spiralAngle + time * params.rotationSpeed;
                     
-                    // Add turbulence
-                    const turbulence = Math.sin(time * 3 + threadIdx + i * 0.1) * params.turbulence;
-                    const radiusWithTurb = radius * (1 + turbulence);
-                    
-                    // Add pulse effect
-                    const pulse = 1 + Math.sin(time * 2 - t * Math.PI) * params.pulse * 0.2;
-                    
-                    const x = Math.cos(rotationAngle) * radiusWithTurb * pulse;
-                    const z = Math.sin(rotationAngle) * radiusWithTurb * pulse;
-                    
-                    positions[idx] = x;
-                    positions[idx + 1] = y;
-                    positions[idx + 2] = z;
+                    if (i <= bodySegments) {
+                        // Main tornado body
+                        const y = t * params.height - params.height / 2;
+                        const radius = params.baseRadius + (params.topRadius - params.baseRadius) * t;
+                        
+                        // Add upward flow animation to the spiral angle
+                        const spiralAngle = baseAngle + t * params.twist - time * params.flowSpeed;
+                        const rotationAngle = spiralAngle + time * params.rotationSpeed;
+                        
+                        // Add turbulence
+                        const turbulence = Math.sin(time * 3 + threadIdx + i * 0.1) * params.turbulence;
+                        const radiusWithTurb = radius * (1 + turbulence);
+                        
+                        // Add pulse effect
+                        const pulse = 1 + Math.sin(time * 2 - t * Math.PI) * params.pulse * 0.2;
+                        
+                        const x = Math.cos(rotationAngle) * radiusWithTurb * pulse;
+                        const z = Math.sin(rotationAngle) * radiusWithTurb * pulse;
+                        
+                        positions[idx] = x;
+                        positions[idx + 1] = y;
+                        positions[idx + 2] = z;
+                    } else {
+                        // Hemisphere cap
+                        const capIdx = i - bodySegments;
+                        const capT = capIdx / capSegments;
+                        const phi = Math.asin(capT);
+                        
+                        const localRadius = neckRadius * Math.cos(phi);
+                        const y = capStartY + neckRadius * Math.sin(phi);
+                        
+                        // Cap animation control: 0 = fixed, 1 = animated
+                        let spiralAngle = baseAngle + t * params.twist;
+                        let rotationAngle = spiralAngle;
+                        
+                        if (params.capAnimation === 1) {
+                            spiralAngle = baseAngle + t * params.twist - time * params.flowSpeed;
+                            rotationAngle = spiralAngle + time * params.rotationSpeed;
+                        }
+                        
+                        // Add turbulence
+                        const turbulence = Math.sin(time * 3 + threadIdx + i * 0.1) * params.turbulence;
+                        const radiusWithTurb = localRadius * (1 + turbulence * params.capAnimation);
+                        
+                        // Add pulse effect (reduced for cap)
+                        const pulse = 1 + Math.sin(time * 2 - t * Math.PI) * params.pulse * 0.1 * params.capAnimation;
+                        
+                        const x = Math.cos(rotationAngle) * radiusWithTurb * pulse;
+                        const z = Math.sin(rotationAngle) * radiusWithTurb * pulse;
+                        
+                        positions[idx] = x;
+                        positions[idx + 1] = y;
+                        positions[idx + 2] = z;
+                    }
                 }
                 
                 thread.geometry.attributes.position.needsUpdate = true;
@@ -518,6 +599,11 @@
             updateDisplay('pulse', params.pulse.toFixed(2));
         });
         
+        document.getElementById('capAnimation').addEventListener('input', (e) => {
+            params.capAnimation = parseInt(e.target.value);
+            updateDisplay('capAnimation', params.capAnimation === 0 ? 'Fixed' : 'Animated', '');
+        });
+        
         document.getElementById('coreColor').addEventListener('input', (e) => {
             params.coreColor.set(e.target.value);
             createTornado();
@@ -566,6 +652,7 @@
             document.getElementById('flowSpeed').value = 0.5;
             document.getElementById('turbulence').value = 0.15;
             document.getElementById('pulse').value = 0.3;
+            document.getElementById('capAnimation').value = 0;
             document.getElementById('coreColor').value = '#ff6600';
             document.getElementById('midColor').value = '#ffaa00';
             document.getElementById('outerColor').value = '#00ccff';
@@ -586,6 +673,7 @@
                 flowSpeed: 0.5,
                 turbulence: 0.15,
                 pulse: 0.3,
+                capAnimation: 0,
                 coreColor: new THREE.Color(0xff6600),
                 midColor: new THREE.Color(0xffaa00),
                 outerColor: new THREE.Color(0x00ccff),
@@ -611,6 +699,7 @@
             updateDisplay('flowSpeed', params.flowSpeed.toFixed(1));
             updateDisplay('turbulence', params.turbulence.toFixed(2));
             updateDisplay('pulse', params.pulse.toFixed(2));
+            updateDisplay('capAnimation', params.capAnimation === 0 ? 'Fixed' : 'Animated', '');
             updateDisplay('ambient', params.ambient.toFixed(2));
             updateDisplay('bloom', params.bloom.toFixed(1));
             updateDisplay('cameraDistance', params.cameraDistance.toFixed(1));
