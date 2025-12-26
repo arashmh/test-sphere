@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Abstract Luminous Tornado</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #000; font-family: sans-serif; }
+        canvas { display: block; }
+        #loading {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            color: #daa520; font-size: 24px; letter-spacing: 2px; pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">GENERATING ENERGY...</div>
+
+    <!-- Import Map for Three.js and Addons -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        import GUI from 'three/addons/libs/lil-gui.module.min.js';
+
+        // --- SCENE SETUP ---
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x000000, 0.05);
+
+        const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
+        camera.position.set(0, 1.2, 4);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.toneMapping = THREE.ReinhardToneMapping;
+        document.body.appendChild(renderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.target.set(0, 1, 0);
+
+        // --- POST PROCESSING (BLOOM) ---
+        const renderScene = new RenderPass(scene, camera);
+        const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
+        bloomPass.threshold = 0;
+        bloomPass.strength = 2.0; // High glow
+        bloomPass.radius = 0.5;
+
+        const composer = new EffectComposer(renderer);
+        composer.addPass(renderScene);
+        composer.addPass(bloomPass);
+
+        // --- CONFIGURATION OBJECT ---
+        const params = {
+            // Colors
+            coreColor: '#ffaa00',
+            outerColor: '#ff2200',
+            threadColor: '#ffd700',
+            
+            // Physics / Motion
+            speed: 1.0,
+            twist: 5.0,
+            riseSpeed: 1.0,
+            turbulence: 0.3,
+            
+            // Shape
+            baseRadius: 0.1,
+            bulbRadius: 1.2,
+            height: 2.2,
+            bulbHeightStart: 0.4,
+            
+            // Visuals
+            particleCount: 8000,
+            particleSize: 4.0,
+            bloomStrength: 2.0,
+            opacity: 0.8,
+            
+            // Layers
+            showParticles: true,
+            showThreads: true,
+            showGlass: true
+        };
+
+        // --- HELPERS ---
+        // We use a custom GLSL shader to handle the complex twisting motion efficiently on the GPU.
+        
+        const vertexShaderParticles = `
+            uniform float uTime;
+            uniform float uHeight;
+            uniform float uSpeed;
+            uniform float uTwist;
+            uniform float uBaseRadius;
+            uniform float uBulbRadius;
+            uniform float uBulbStart;
+            uniform float uTurbulence;
+            uniform float uSize;
+
+            attribute float aRandom;
+            attribute float aSpeedOffset;
+
+            varying float vHeightNorm;
+            varying float vAlpha;
+
+            // Simple noise function
+            float random(vec2 st) {
+                return fract(sin(dot(st.xy, vec2(12.9898,78.233))) * 43758.5453123);
+            }
+
+            void main() {
+                // Calculate normalized height (0 to 1 cycle)
+                float cycleTime = uTime * uSpeed * aSpeedOffset;
+                float currentHeight = mod(cycleTime, uHeight);
+                float hNorm = currentHeight / uHeight;
+                vHeightNorm = hNorm;
+
+                // Shape Logic: Stem into Bulb
+                float radius = mix(uBaseRadius, uBulbRadius, smoothstep(0.0, uBulbStart, hNorm));
+                
+                // Taper the top slightly to close the bulb
+                radius *= smoothstep(1.0, 0.8, hNorm);
+
+                // Rotation
+                float angle = (uTime * 0.5) + (hNorm * uTwist) + (aRandom * 6.28);
+                
+                // Turbulence
+                float turbX = sin(uTime * 5.0 + hNorm * 10.0) * uTurbulence * (hNorm * 0.5);
+                float turbZ = cos(uTime * 4.0 + hNorm * 10.0) * uTurbulence * (hNorm * 0.5);
+
+                vec3 newPos = position;
+                newPos.x = cos(angle) * radius + turbX;
+                newPos.z = sin(angle) * radius + turbZ;
+                newPos.y = currentHeight;
+
+                vec4 mvPosition = modelViewMatrix * vec4(newPos, 1.0);
+                
+                // Size attenuation
+                gl_PointSize = uSize * (1.0 / -mvPosition.z);
+                
+                // Fade in/out at bottom/top
+                vAlpha = smoothstep(0.0, 0.1, hNorm) * (1.0 - smoothstep(0.9, 1.0, hNorm));
+
+                gl_Position = projectionMatrix * mvPosition;
+            }
+        `;
+
+        const fragmentShaderParticles = `
+            uniform vec3 uColor1;
+            uniform vec3 uColor2;
+            uniform float uOpacity;
+
+            varying float vHeightNorm;
+            varying float vAlpha;
+
+            void main() {
+                // Soft circle particle
+                vec2 coord = gl_PointCoord - vec2(0.5);
+                float dist = length(coord);
+                if(dist > 0.5) discard;
+
+                // Soft glow edge
+                float strength = 1.0 - (dist * 2.0);
+                strength = pow(strength, 2.0);
+
+                // Gradient Color
+                vec3 finalColor = mix(uColor1, uColor2, vHeightNorm);
+
+                gl_FragColor = vec4(finalColor, strength * vAlpha * uOpacity);
+            }
+        `;
+
+        // --- PARTICLE SYSTEM CREATION ---
+        const particleGeometry = new THREE.BufferGeometry();
+        const particleCount = params.particleCount;
+        const posArray = new Float32Array(particleCount * 3);
+        const randomArray = new Float32Array(particleCount);
+        const speedOffsetArray = new Float32Array(particleCount);
+
+        for(let i=0; i<particleCount; i++){
+            posArray[i*3] = 0;
+            posArray[i*3+1] = 0;
+            posArray[i*3+2] = 0;
+            randomArray[i] = Math.random();
+            speedOffsetArray[i] = 0.5 + Math.random() * 1.0; // Varying speeds
+        }
+
+        particleGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+        particleGeometry.setAttribute('aRandom', new THREE.BufferAttribute(randomArray, 1));
+        particleGeometry.setAttribute('aSpeedOffset', new THREE.BufferAttribute(speedOffsetArray, 1));
+
+        const particleMaterial = new THREE.ShaderMaterial({
+            vertexShader: vertexShaderParticles,
+            fragmentShader: fragmentShaderParticles,
+            uniforms: {
+                uTime: { value: 0 },
+                uHeight: { value: params.height },
+                uSpeed: { value: params.speed },
+                uTwist: { value: params.twist },
+                uBaseRadius: { value: params.baseRadius },
+                uBulbRadius: { value: params.bulbRadius },
+                uBulbStart: { value: params.bulbHeightStart },
+                uTurbulence: { value: params.turbulence },
+                uSize: { value: params.particleSize },
+                uColor1: { value: new THREE.Color(params.coreColor) },
+                uColor2: { value: new THREE.Color(params.outerColor) },
+                uOpacity: { value: params.opacity }
+            },
+            transparent: true,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending
+        });
+
+        const particleSystem = new THREE.Points(particleGeometry, particleMaterial);
+        scene.add(particleSystem);
+
+
+        // --- THREADS / SMOKE LAYER (Volumetric Mesh) ---
+        // To create the "threads" effect, we use a cylinder with a noisy shader
+        const threadGeometry = new THREE.CylinderGeometry(1, 1, 2, 64, 32, true);
+        // We will displace vertices in vertex shader to match the particle shape
+        
+        const vertexShaderThreads = `
+            uniform float uTime;
+            uniform float uHeight;
+            uniform float uBaseRadius;
+            uniform float uBulbRadius;
+            uniform float uBulbStart;
+            uniform float uTwist;
+
+            varying vec2 vUv;
+            varying float vHeightNorm;
+
+            void main() {
+                vUv = uv;
+                
+                // Map cylinder Y (-1 to 1) to 0 to 1
+                float hNorm = uv.y; 
+                vHeightNorm = hNorm;
+                
+                // Calculate Radius profile
+                float radius = mix(uBaseRadius, uBulbRadius, smoothstep(0.0, uBulbStart, hNorm));
+                radius *= smoothstep(1.0, 0.8, hNorm); // Taper top
+
+                // Apply Twist to geometry
+                float angle = (hNorm * uTwist) - (uTime * 0.2);
+                float c = cos(angle);
+                float s = sin(angle);
+                
+                // Rotate vertex x,z
+                vec3 pos = position;
+                // Center y to 0..height
+                pos.y = hNorm * uHeight; 
+                
+                // Apply rotation
+                float nx = pos.x * c - pos.z * s;
+                float nz = pos.x * s + pos.z * c;
+                
+                // Apply radius scaling (assuming base cylinder r=1)
+                pos.x = nx * radius;
+                pos.z = nz * radius;
+
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+            }
+        `;
+
+        const fragmentShaderThreads = `
+            uniform float uTime;
+            uniform vec3 uColor;
+            
+            varying vec2 vUv;
+            varying float vHeightNorm;
+
+            // Simplex Noise (simplified for GLSL)
+            vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+            vec2 mod289(vec2 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+            vec3 permute(vec3 x) { return mod289(((x*34.0)+1.0)*x); }
+            float snoise(vec2 v) {
+                const vec4 C = vec4(0.211324865405187, 0.366025403784439, -0.577350269189626, 0.024390243902439);
+                vec2 i  = floor(v + dot(v, C.yy) );
+                vec2 x0 = v - i + dot(i, C.xx);
+                vec2 i1;
+                i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
+                vec4 x12 = x0.xyxy + C.xxzz;
+                x12.xy -= i1;
+                i = mod289(i);
+                vec3 p = permute( permute( i.y + vec3(0.0, i1.y, 1.0 )) + i.x + vec3(0.0, i1.x, 1.0 ));
+                vec3 m = max(0.5 - vec3(dot(x0,x0), dot(x12.xy,x12.xy), dot(x12.zw,x12.zw)), 0.0);
+                m = m*m ;
+                return 42.0 * dot( m*m, vec3( dot(p.x,x0), dot(p.y,x12.xy), dot(p.z,x12.zw) ) );
+            }
+
+            void main() {
+                // Moving noise texture
+                float noiseScale = 5.0;
+                float timeSpeed = uTime * 0.5;
+                
+                // Create "threads" by stretching noise vertically
+                float n = snoise(vec2(vUv.x * 10.0, vUv.y * 2.0 - timeSpeed));
+                
+                // Create thin glowing lines
+                float alpha = smoothstep(0.4, 0.6, n); // Sharpen noise
+                
+                // Fade top and bottom
+                float fade = smoothstep(0.0, 0.1, vHeightNorm) * (1.0 - smoothstep(0.9, 1.0, vHeightNorm));
+
+                gl_FragColor = vec4(uColor, alpha * 0.3 * fade);
+            }
+        `;
+
+        const threadMaterial = new THREE.ShaderMaterial({
+            vertexShader: vertexShaderThreads,
+            fragmentShader: fragmentShaderThreads,
+            uniforms: {
+                uTime: { value: 0 },
+                uHeight: { value: params.height },
+                uBaseRadius: { value: params.baseRadius },
+                uBulbRadius: { value: params.bulbRadius },
+                uBulbStart: { value: params.bulbHeightStart },
+                uTwist: { value: params.twist },
+                uColor: { value: new THREE.Color(params.threadColor) }
+            },
+            transparent: true,
+            depthWrite: false,
+            side: THREE.DoubleSide,
+            blending: THREE.AdditiveBlending
+        });
+
+        const threadMesh = new THREE.Mesh(threadGeometry, threadMaterial);
+        scene.add(threadMesh);
+
+
+        // --- GLASS SHELL (Subtle Fresnel) ---
+        const glassGeo = new THREE.CylinderGeometry(1, 1, 2, 64, 32, true);
+        const glassMat = new THREE.ShaderMaterial({
+            vertexShader: vertexShaderThreads, // Reuse geometry logic
+            fragmentShader: `
+                varying vec2 vUv;
+                varying float vHeightNorm;
+                void main() {
+                     // Simple rim light effect
+                     // In a real PBR this is Fresnel, here we cheat with opacity
+                     float alpha = 0.05; 
+                     float fade = smoothstep(0.0, 0.1, vHeightNorm) * (1.0 - smoothstep(0.95, 1.0, vHeightNorm));
+                     gl_FragColor = vec4(1.0, 1.0, 1.0, alpha * fade);
+                }
+            `,
+            uniforms: threadMaterial.uniforms, // Share uniforms for shape sync
+            transparent: true,
+            depthWrite: false,
+            side: THREE.FrontSide,
+            blending: THREE.AdditiveBlending
+        });
+        const glassMesh = new THREE.Mesh(glassGeo, glassMat);
+        scene.add(glassMesh);
+
+        // --- GROUND REFLECTION (Fake) ---
+        const groundGeo = new THREE.PlaneGeometry(5, 5);
+        const groundMat = new THREE.MeshBasicMaterial({ 
+            color: 0x000000, 
+        });
+        const ground = new THREE.Mesh(groundGeo, groundMat);
+        ground.rotation.x = -Math.PI / 2;
+        scene.add(ground);
+        
+        // Add a simple ring light at the bottom
+        const ringGeo = new THREE.RingGeometry(0.1, 0.5, 32);
+        const ringMat = new THREE.MeshBasicMaterial({ color: params.coreColor, side: THREE.DoubleSide, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending });
+        const ring = new THREE.Mesh(ringGeo, ringMat);
+        ring.rotation.x = -Math.PI / 2;
+        ring.position.y = 0.01;
+        scene.add(ring);
+
+
+        // --- GUI CONTROLS ---
+        const gui = new GUI({ title: 'Tornado Control' });
+
+        const folderVisuals = gui.addFolder('Visuals');
+        folderVisuals.addColor(params, 'coreColor').onChange(v => {
+            particleMaterial.uniforms.uColor1.value.set(v);
+            ringMat.color.set(v);
+        });
+        folderVisuals.addColor(params, 'outerColor').onChange(v => particleMaterial.uniforms.uColor2.value.set(v));
+        folderVisuals.addColor(params, 'threadColor').onChange(v => threadMaterial.uniforms.uColor.value.set(v));
+        folderVisuals.add(params, 'bloomStrength', 0, 5).onChange(v => bloomPass.strength = v);
+        folderVisuals.add(params, 'opacity', 0, 1).onChange(v => particleMaterial.uniforms.uOpacity.value = v);
+        folderVisuals.add(params, 'particleSize', 0.1, 20).onChange(v => particleMaterial.uniforms.uSize.value = v);
+
+        const folderPhysics = gui.addFolder('Dynamics');
+        folderPhysics.add(params, 'speed', 0, 5).onChange(v => particleMaterial.uniforms.uSpeed.value = v);
+        folderPhysics.add(params, 'twist', -20, 20).onChange(v => {
+            particleMaterial.uniforms.uTwist.value = v;
+            threadMaterial.uniforms.uTwist.value = v;
+        });
+        folderPhysics.add(params, 'turbulence', 0, 2).onChange(v => particleMaterial.uniforms.uTurbulence.value = v);
+
+        const folderShape = gui.addFolder('Shape');
+        folderShape.add(params, 'baseRadius', 0, 1).onChange(v => {
+            particleMaterial.uniforms.uBaseRadius.value = v;
+            threadMaterial.uniforms.uBaseRadius.value = v;
+        });
+        folderShape.add(params, 'bulbRadius', 0.5, 3).onChange(v => {
+            particleMaterial.uniforms.uBulbRadius.value = v;
+            threadMaterial.uniforms.uBulbRadius.value = v;
+        });
+        folderShape.add(params, 'bulbHeightStart', 0.1, 0.9).onChange(v => {
+            particleMaterial.uniforms.uBulbStart.value = v;
+            threadMaterial.uniforms.uBulbStart.value = v;
+        });
+
+        const folderLayers = gui.addFolder('Layers');
+        folderLayers.add(params, 'showParticles').onChange(v => particleSystem.visible = v);
+        folderLayers.add(params, 'showThreads').onChange(v => threadMesh.visible = v);
+        folderLayers.add(params, 'showGlass').onChange(v => glassMesh.visible = v);
+
+        document.getElementById('loading').style.display = 'none';
+
+        // --- ANIMATION LOOP ---
+        const clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const time = clock.getElapsedTime();
+
+            // Update Uniforms
+            particleMaterial.uniforms.uTime.value = time;
+            threadMaterial.uniforms.uTime.value = time;
+            
+            // Subtle camera movement for drama
+            // camera.position.x = Math.sin(time * 0.1) * 0.5;
+
+            controls.update();
+            composer.render();
+        }
+
+        // Handle resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
+</html>

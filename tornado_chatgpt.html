@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Energy Tornado</title>
+
+<style>
+  body {
+    margin: 0;
+    overflow: hidden;
+    background: black;
+  }
+  canvas {
+    display: block;
+  }
+</style>
+
+<!-- FIX: Add Import Map so browser knows where "three" is -->
+<script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.158.0/examples/jsm/"
+    }
+  }
+</script>
+</head>
+
+<body>
+
+<script type="module">
+/* =========================
+   IMPORTS
+========================= */
+// FIX: Use the names defined in the importmap above
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import GUI from "https://cdn.jsdelivr.net/npm/lil-gui@0.18/+esm";
+
+/* =========================
+   SCENE SETUP
+========================= */
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0x000000, 3, 20);
+
+const camera = new THREE.PerspectiveCamera(
+  45,
+  window.innerWidth / window.innerHeight,
+  0.1,
+  100
+);
+camera.position.set(0, 1.6, 5);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setClearColor(0x000000);
+document.body.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+
+/* =========================
+   PARAMETERS
+========================= */
+const params = {
+  height: 2.0,
+  radius: 0.7,
+  swirl: 3.0,
+  speed: 1.0,
+  turbulence: 0.6,
+  glow: 1.4,
+  particleCount: 9000,
+  colorA: "#ffb000",
+  colorB: "#ff4500"
+};
+
+/* =========================
+   SHADERS
+========================= */
+const vertexShader = `
+attribute float aOffset;
+attribute float aAngle;
+
+uniform float time;
+uniform float height;
+uniform float radius;
+uniform float swirl;
+uniform float turbulence;
+
+varying float vAlpha;
+
+void main() {
+  float t = mod(aOffset + time * 0.2, 1.0);
+  float y = t * height - height * 0.5;
+
+  float angle = aAngle + t * swirl * 6.283;
+  float r = radius * (1.0 - t);
+
+  float wobble = sin(t * 12.0 + time * 2.0) * turbulence;
+
+  vec3 pos = vec3(
+    cos(angle) * (r + wobble),
+    y,
+    sin(angle) * (r + wobble)
+  );
+
+  vAlpha = 1.0 - t;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+  gl_PointSize = 3.0 + 6.0 * vAlpha;
+}
+`;
+
+const fragmentShader = `
+uniform vec3 colorA;
+uniform vec3 colorB;
+uniform float glow;
+varying float vAlpha;
+
+void main() {
+  float d = length(gl_PointCoord - 0.5);
+  float alpha = smoothstep(0.5, 0.0, d) * vAlpha;
+  vec3 color = mix(colorA, colorB, vAlpha);
+  gl_FragColor = vec4(color * glow, alpha);
+}
+`;
+
+/* =========================
+   GEOMETRY
+========================= */
+const geometry = new THREE.BufferGeometry();
+const count = params.particleCount;
+
+const positions = new Float32Array(count * 3);
+const offsets = new Float32Array(count);
+const angles = new Float32Array(count);
+
+for (let i = 0; i < count; i++) {
+  offsets[i] = Math.random();
+  angles[i] = Math.random() * Math.PI * 2;
+}
+
+geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+geometry.setAttribute("aOffset", new THREE.BufferAttribute(offsets, 1));
+geometry.setAttribute("aAngle", new THREE.BufferAttribute(angles, 1));
+
+/* =========================
+   MATERIAL
+========================= */
+const material = new THREE.ShaderMaterial({
+  vertexShader,
+  fragmentShader,
+  transparent: true,
+  depthWrite: false,
+  blending: THREE.AdditiveBlending,
+  uniforms: {
+    time: { value: 0 },
+    height: { value: params.height },
+    radius: { value: params.radius },
+    swirl: { value: params.swirl },
+    turbulence: { value: params.turbulence },
+    glow: { value: params.glow },
+    colorA: { value: new THREE.Color(params.colorA) },
+    colorB: { value: new THREE.Color(params.colorB) }
+  }
+});
+
+const points = new THREE.Points(geometry, material);
+scene.add(points);
+
+/* =========================
+   GUI
+========================= */
+const gui = new GUI();
+
+gui.add(params, "height", 0.5, 4).onChange(v => material.uniforms.height.value = v);
+gui.add(params, "radius", 0.1, 2).onChange(v => material.uniforms.radius.value = v);
+gui.add(params, "swirl", 0, 6).onChange(v => material.uniforms.swirl.value = v);
+gui.add(params, "turbulence", 0, 2).onChange(v => material.uniforms.turbulence.value = v);
+gui.add(params, "speed", 0.1, 3);
+gui.add(params, "glow", 0.1, 3).onChange(v => material.uniforms.glow.value = v);
+gui.addColor(params, "colorA").onChange(v => material.uniforms.colorA.value.set(v));
+gui.addColor(params, "colorB").onChange(v => material.uniforms.colorB.value.set(v));
+
+/* =========================
+   ANIMATION LOOP
+========================= */
+const clock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+  material.uniforms.time.value += clock.getDelta() * params.speed;
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+animate();
+
+/* =========================
+   RESIZE
+========================= */
+window.addEventListener("resize", () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+
+</body>
+</html>
