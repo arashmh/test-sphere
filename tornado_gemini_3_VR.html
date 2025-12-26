@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Living Plasma Vortex - Performance Mode</title>
+    <title>The Living Plasma Vortex - VR Mode</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; font-family: sans-serif; }
         canvas { display: block; }
@@ -17,7 +17,7 @@
     </style>
 </head>
 <body>
-    <div id="loading">INITIALIZING SYSTEMS...</div>
+    <div id="loading">INITIALIZING VR SYSTEMS...</div>
     
     <!-- Import Map -->
     <script type="importmap">
@@ -33,39 +33,20 @@
     <script type="module">
         import * as THREE from 'three';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-        import Stats from 'three/addons/libs/stats.module.js'; // Import Stats
+        import { VRButton } from 'three/addons/webxr/VRButton.js';
+        import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
+        import Stats from 'three/addons/libs/stats.module.js';
         import GUI from 'lil-gui';
 
         // --- CONFIG & STATE ---
         const params = {
-            // Geometry
-            baseWidth: 1.8,
-            stemPinch: 0.2,
-            bulbWidth: 1.9,
-            bulbHeight: 6.5,
-            totalHeight: 7.0,
-            
-            // Plasma
-            coreColor: '#fffdb0',
-            midColor: '#ffaa00',
-            edgeColor: '#aa2200',
-            flowSpeed: 1.2,
-            twistSpeed: 0.2,
-            twistStrength: 1.0,
-            noiseScale: 1.0,
-            roughness: 2.0,
-            brightness: 1.5,
-            
-            // Shell
-            rimColor: '#aaccff',
-            shellPulseSpeed: 0.5,
-            shellDisplacement: 0.08,
-            fresnelPower: 3.0,
-            shellOpacity: 0.8,
-            
-            // Floor
-            poolSize: 1.0,
-            poolColor: '#ffaa00'
+            baseWidth: 1.8, stemPinch: 0.2, bulbWidth: 1.9, bulbHeight: 6.5, totalHeight: 7.0,
+            coreColor: '#fffdb0', midColor: '#ffaa00', edgeColor: '#aa2200',
+            flowSpeed: 1.2, twistSpeed: 0.2, twistStrength: 1.0, noiseScale: 1.0,
+            roughness: 2.0, brightness: 1.5,
+            rimColor: '#aaccff', shellPulseSpeed: 0.5, shellDisplacement: 0.08,
+            fresnelPower: 3.0, shellOpacity: 0.8,
+            poolSize: 1.0, poolColor: '#ffaa00'
         };
 
         // --- SCENE SETUP ---
@@ -74,24 +55,71 @@
         scene.fog = new THREE.FogExp2(0x000000, 0.02);
 
         const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
-        camera.position.set(0, 5, 12);
+        
+        // --- VR RIG SETUP ---
+        const dolly = new THREE.Group();
+        dolly.position.set(0, 0, 8); // Start user 8 meters back
+        dolly.add(camera);
+        scene.add(dolly);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.xr.enabled = true; // ENABLE WE BXR
         document.body.appendChild(renderer.domElement);
+        document.body.appendChild(VRButton.createButton(renderer));
 
-        // --- STATS SETUP ---
+        // --- STATS ---
         const stats = new Stats();
-        document.body.appendChild(stats.dom); // Adds FPS counter to top-left
+        document.body.appendChild(stats.dom);
 
-        // --- CONTROLS ---
+        // --- DESKTOP CONTROLS (Fallback) ---
         const controls = new OrbitControls(camera, renderer.domElement);
-        controls.enableDamping = true;
-        controls.dampingFactor = 0.05;
         controls.target.set(0, 3.5, 0);
+        controls.enableDamping = true;
 
-        // --- NOISE SHADER CHUNK ---
+        // --- VR CONTROLLERS & RAYCASTING ---
+        const controller1 = renderer.xr.getController(0);
+        const controller2 = renderer.xr.getController(1);
+        dolly.add(controller1);
+        dolly.add(controller2);
+
+        // Controller Models
+        const controllerModelFactory = new XRControllerModelFactory();
+        const controllerGrip1 = renderer.xr.getControllerGrip(0);
+        controllerGrip1.add(controllerModelFactory.createControllerModel(controllerGrip1));
+        dolly.add(controllerGrip1);
+
+        const controllerGrip2 = renderer.xr.getControllerGrip(1);
+        controllerGrip2.add(controllerModelFactory.createControllerModel(controllerGrip2));
+        dolly.add(controllerGrip2);
+
+        // Laser pointer visuals
+        const laserGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0), new THREE.Vector3(0,0,-1)]);
+        const laserMat = new THREE.LineBasicMaterial({ color: 0xffffff });
+        const laser1 = new THREE.Line(laserGeo, laserMat); laser1.name = 'laser'; laser1.scale.z = 5;
+        const laser2 = new THREE.Line(laserGeo, laserMat); laser2.name = 'laser'; laser2.scale.z = 5;
+        controller1.add(laser1);
+        controller2.add(laser2);
+
+        // Teleport Marker
+        const markerGeo = new THREE.RingGeometry(0.15, 0.2, 32).rotateX(-Math.PI / 2);
+        const markerMat = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+        const teleportMarker = new THREE.Mesh(markerGeo, markerMat);
+        teleportMarker.visible = false;
+        scene.add(teleportMarker);
+
+        // Physics Floor (Invisible, larger than visual floor for teleporting)
+        const floorGeo = new THREE.PlaneGeometry(50, 50);
+        const floorPhysMat = new THREE.MeshBasicMaterial({ visible: false });
+        const floorPhys = new THREE.Mesh(floorGeo, floorPhysMat);
+        floorPhys.rotation.x = -Math.PI / 2;
+        scene.add(floorPhys);
+
+        const raycaster = new THREE.Raycaster();
+        const tempMatrix = new THREE.Matrix4();
+
+        // --- SHADER CHUNKS ---
         const noiseChunk = `
             vec4 permute(vec4 x){return mod(((x*34.0)+1.0)*x, 289.0);}
             vec4 taylorInvSqrt(vec4 r){return 1.79284291400159 - 0.85373472095314 * r;}
@@ -284,9 +312,13 @@
 
         // --- GEOMETRY ---
         let coreMesh, shellMesh;
+        // Create a group for the vortex so we can move/interact with it as one unit if needed
+        const vortexGroup = new THREE.Group(); 
+        scene.add(vortexGroup);
+
         function generateGeometry() {
-            if(coreMesh) { coreMesh.geometry.dispose(); scene.remove(coreMesh); }
-            if(shellMesh) { shellMesh.geometry.dispose(); scene.remove(shellMesh); }
+            if(coreMesh) { coreMesh.geometry.dispose(); vortexGroup.remove(coreMesh); }
+            if(shellMesh) { shellMesh.geometry.dispose(); vortexGroup.remove(shellMesh); }
 
             const points = [];
             points.push(new THREE.Vector2(params.baseWidth, 0));
@@ -303,21 +335,22 @@
             plasmaMaterial.uniforms.uHeight.value = params.totalHeight;
             
             coreMesh = new THREE.Mesh(geometry, plasmaMaterial);
-            scene.add(coreMesh);
+            vortexGroup.add(coreMesh);
 
             shellMesh = new THREE.Mesh(geometry.clone(), shellMaterial);
             shellMesh.scale.set(1.05, 1.02, 1.05);
-            scene.add(shellMesh);
+            vortexGroup.add(shellMesh);
         }
         generateGeometry();
 
+        // Visual Floor
         const floorGeometry = new THREE.PlaneGeometry(5, 5);
         const floorMesh = new THREE.Mesh(floorGeometry, floorMaterial);
         floorMesh.rotation.x = -Math.PI / 2;
         floorMesh.position.y = 0.05;
         scene.add(floorMesh);
 
-        // --- GUI ---
+        // --- GUI (Desktop only) ---
         const gui = new GUI({ title: 'Vortex Controller' });
         const fShape = gui.addFolder('Geometry');
         fShape.add(params, 'baseWidth', 0.5, 4.0).onChange(generateGeometry);
@@ -325,47 +358,117 @@
         fShape.add(params, 'bulbWidth', 1.0, 4.0).onChange(generateGeometry);
         fShape.add(params, 'bulbHeight', 3.0, 10.0).onChange(generateGeometry);
         fShape.add(params, 'totalHeight', 4.0, 12.0).onChange(generateGeometry);
-
         const fPlasma = gui.addFolder('Plasma');
         fPlasma.addColor(params, 'coreColor').onChange(v => plasmaMaterial.uniforms.uColorCore.value.set(v));
-        fPlasma.addColor(params, 'midColor').onChange(v => plasmaMaterial.uniforms.uColorMid.value.set(v));
-        fPlasma.addColor(params, 'edgeColor').onChange(v => plasmaMaterial.uniforms.uColorEdge.value.set(v));
-        fPlasma.add(params, 'brightness', 0.5, 3.0).onChange(v => plasmaMaterial.uniforms.uBrightness.value = v);
         fPlasma.add(params, 'flowSpeed', 0.0, 3.0).onChange(v => plasmaMaterial.uniforms.uFlowSpeed.value = v);
-        fPlasma.add(params, 'twistSpeed', -1.0, 1.0).onChange(v => plasmaMaterial.uniforms.uTwistSpeed.value = v);
-        fPlasma.add(params, 'twistStrength', 0.0, 3.0).onChange(v => plasmaMaterial.uniforms.uTwistStrength.value = v);
-        fPlasma.add(params, 'noiseScale', 0.5, 3.0).onChange(v => plasmaMaterial.uniforms.uNoiseScale.value = v);
-        fPlasma.add(params, 'roughness', 1.0, 5.0).onChange(v => plasmaMaterial.uniforms.uRoughness.value = v);
 
-        const fShell = gui.addFolder('Force Field');
-        fShell.addColor(params, 'rimColor').onChange(v => shellMaterial.uniforms.uColorRim.value.set(v));
-        fShell.add(params, 'shellOpacity', 0.0, 1.0).onChange(v => shellMaterial.uniforms.uOpacity.value = v);
-        fShell.add(params, 'fresnelPower', 1.0, 5.0).onChange(v => shellMaterial.uniforms.uFresnelPower.value = v);
-        fShell.add(params, 'shellPulseSpeed', 0.0, 3.0).onChange(v => shellMaterial.uniforms.uPulseSpeed.value = v);
-        fShell.add(params, 'shellDisplacement', 0.0, 0.2).onChange(v => shellMaterial.uniforms.uDisplacement.value = v);
+        // --- VR INTERACTION LOGIC ---
+        
+        // 1. Teleportation Logic
+        function handleTeleport(controller) {
+            controller.updateMatrixWorld();
+            tempMatrix.identity().extractRotation(controller.matrixWorld);
+            raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
+            raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
+            
+            // Raycast against the invisible physical floor
+            const intersects = raycaster.intersectObject(floorPhys);
 
-        const fFloor = gui.addFolder('Floor');
-        fFloor.addColor(params, 'poolColor').onChange(v => floorMaterial.uniforms.uColor.value.set(v));
-        fFloor.add(params, 'poolSize', 0.0, 3.0).onChange(v => floorMesh.scale.set(v, v, v));
+            if (intersects.length > 0) {
+                const intersect = intersects[0];
+                const laser = controller.getObjectByName('laser');
+                if (laser) laser.scale.z = intersect.distance;
+                
+                teleportMarker.position.copy(intersect.point);
+                teleportMarker.position.y += 0.05; // hover slightly
+                teleportMarker.visible = true;
+                controller.userData.teleportTarget = intersect.point;
+            } else {
+                teleportMarker.visible = false;
+                const laser = controller.getObjectByName('laser');
+                if (laser) laser.scale.z = 5; // default length
+                controller.userData.teleportTarget = null;
+            }
+        }
+
+        // Event Listeners for Teleport (Trigger)
+        function onSelectStart(event) { event.target.userData.isSelecting = true; }
+        
+        function onSelectEnd(event) { 
+            const controller = event.target;
+            controller.userData.isSelecting = false;
+            
+            if (controller.userData.teleportTarget) {
+                const target = controller.userData.teleportTarget;
+                // Teleport Dolly
+                const offset = dolly.position.clone().sub(target).setY(0);
+                dolly.position.sub(offset);
+                // Also reset marker
+                teleportMarker.visible = false;
+                controller.userData.teleportTarget = null;
+            }
+        }
+
+        controller1.addEventListener('selectstart', onSelectStart);
+        controller1.addEventListener('selectend', onSelectEnd);
+        controller2.addEventListener('selectstart', onSelectStart);
+        controller2.addEventListener('selectend', onSelectEnd);
 
         // --- ANIMATION ---
         const clock = new THREE.Clock();
-        function animate() {
-            stats.begin(); // Start measuring
+        
+        document.getElementById('loading').style.opacity = 0;
 
+        // WEBXR ANIMATION LOOP
+        renderer.setAnimationLoop(function () {
+            stats.begin();
+            
+            const delta = clock.getDelta();
             const time = clock.getElapsedTime();
-            controls.update();
+
+            // Update Shaders
             plasmaMaterial.uniforms.uTime.value = time;
             shellMaterial.uniforms.uTime.value = time;
             floorMaterial.uniforms.uTime.value = time;
+
+            // Update Controls (Desktop)
+            if (!renderer.xr.isPresenting) {
+                controls.update();
+            }
+
+            // VR Handling
+            if (renderer.xr.isPresenting) {
+                // 1. Raycasting for Teleport (Left or Right controller)
+                if (controller1.userData.isSelecting) handleTeleport(controller1);
+                else if (controller2.userData.isSelecting) handleTeleport(controller2);
+                else teleportMarker.visible = false;
+
+                // 2. Thumbstick Locomotion (Smooth Slide)
+                [controller1, controller2].forEach(ctrl => {
+                    const gamepad = ctrl.gamepad; // WebXR gamepad
+                    if (gamepad && gamepad.axes) {
+                        // Left Stick (Axes 2 & 3 usually) or Right Stick
+                        // Simple check: if axes have value
+                        const ax = gamepad.axes[2] || gamepad.axes[0]; 
+                        const ay = gamepad.axes[3] || gamepad.axes[1];
+
+                        // Smooth Movement (Deadzone check)
+                        if (Math.abs(ax) > 0.1 || Math.abs(ay) > 0.1) {
+                            const speed = 2.0 * delta;
+                            const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(dolly.quaternion);
+                            const right = new THREE.Vector3(1, 0, 0).applyQuaternion(dolly.quaternion);
+                            
+                            // Move dolly based on joystick
+                            dolly.position.add(right.multiplyScalar(ax * speed));
+                            dolly.position.add(forward.multiplyScalar(ay * speed));
+                        }
+                    }
+                });
+            }
+
             renderer.render(scene, camera);
-
-            stats.end(); // Stop measuring
-            requestAnimationFrame(animate);
-        }
-
-        document.getElementById('loading').style.opacity = 0;
-        animate();
+            stats.end();
+        });
 
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
