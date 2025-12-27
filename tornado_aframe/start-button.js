@@ -25,6 +25,8 @@ AFRAME.registerComponent("start-button", {
   setupStyles: function () {
     const style = document.createElement("style");
     style.innerHTML = `
+      @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&display=swap');
+
       #ethereal-overlay {
         position: fixed;
         top: 0;
@@ -42,42 +44,66 @@ AFRAME.registerComponent("start-button", {
       }
 
       #ethereal-text {
-        font-family: 'Times New Roman', serif;
-        color: #e0e0e0;
+        font-family: 'Cinzel', serif;
+        font-weight: 500;
+        color: #e0d0b0; /* Warm beige */
         font-size: 24px;
-        letter-spacing: 8px;
+        letter-spacing: 6px;
         text-transform: uppercase;
         user-select: none;
         -webkit-user-select: none;
         opacity: 0.7;
-        transition: all 0.5s ease;
-        text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+        transition: all 0.6s cubic-bezier(0.25, 1, 0.5, 1);
+        text-shadow: 0 0 15px rgba(180, 150, 100, 0.2);
+        text-align: center;
       }
 
-      @keyframes pulse {
-        0% { opacity: 0.4; text-shadow: 0 0 5px rgba(255,255,255,0.1); }
-        50% { opacity: 1.0; text-shadow: 0 0 15px rgba(255,255,255,0.5); }
-        100% { opacity: 0.4; text-shadow: 0 0 5px rgba(255,255,255,0.1); }
+      /* Pulse animation for loading state */
+      @keyframes soft-pulse {
+        0% { opacity: 0.4; text-shadow: 0 0 5px rgba(255, 200, 120, 0.1); }
+        50% { opacity: 0.9; text-shadow: 0 0 20px rgba(255, 200, 120, 0.4); }
+        100% { opacity: 0.4; text-shadow: 0 0 5px rgba(255, 200, 120, 0.1); }
       }
 
       .ethereal-loading {
-        animation: pulse 3s infinite ease-in-out;
+        animation: soft-pulse 3s infinite ease-in-out;
         cursor: default;
       }
 
       .ethereal-active {
         cursor: pointer;
         opacity: 1 !important;
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        padding: 20px 40px;
-        background: rgba(0,0,0,0.5);
+        font-weight: 700;
+        
+        /* Shape & Border */
+        border: 1px solid rgba(255, 215, 150, 0.3);
+        border-radius: 50px; /* Fully rounded corners */
+        padding: 20px 60px;
+        
+        /* Warm Background */
+        background: radial-gradient(circle, rgba(40, 30, 20, 0.8) 0%, rgba(10, 5, 0, 0.9) 100%);
+        
+        /* Fuzzy Warm Glow (Inner and Outer) */
+        box-shadow: 
+          0 0 20px rgba(255, 180, 100, 0.1), 
+          inset 0 0 20px rgba(255, 180, 100, 0.05);
+        
+        text-shadow: 0 0 12px rgba(255, 220, 180, 0.5);
       }
 
       .ethereal-active:hover {
-        background: rgba(20, 20, 20, 0.8);
-        box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
-        letter-spacing: 12px;
-        color: #ffffff;
+        background: radial-gradient(circle, rgba(60, 45, 30, 0.9) 0%, rgba(20, 10, 0, 0.95) 100%);
+        border-color: rgba(255, 215, 150, 0.6);
+        color: #fff8e7;
+        letter-spacing: 9px; /* Slight expansion */
+        
+        /* Stronger Warm Glow on Hover */
+        box-shadow: 
+          0 0 40px rgba(255, 160, 80, 0.3), 
+          inset 0 0 30px rgba(255, 160, 80, 0.1);
+          
+        text-shadow: 0 0 20px rgba(255, 230, 200, 0.8);
+        transform: scale(1.02);
       }
       
       .hidden {
@@ -103,7 +129,7 @@ AFRAME.registerComponent("start-button", {
 
   onSceneLoaded: function () {
     setTimeout(() => {
-      this.text.innerText = "ENTER VORTEX";
+      this.text.innerText = "ENTER IBI";
       this.text.classList.remove("ethereal-loading");
       this.text.classList.add("ethereal-active");
       this.text.addEventListener("click", this.onStartClick);
@@ -111,7 +137,7 @@ AFRAME.registerComponent("start-button", {
   },
 
   onStartClick: function () {
-    // 1. Enter VR immediately (requires user gesture)
+    // 1. Enter VR
     if (this.data.enter_vr) {
       try {
         this.el.enterVR();
@@ -120,16 +146,14 @@ AFRAME.registerComponent("start-button", {
       }
     }
 
-    // 2. Start Fade Out
+    // 2. Fade Out
     this.overlay.classList.add("hidden");
 
-    // 3. Cleanup and Emit Event after fade finishes
+    // 3. Cleanup and Emit
     setTimeout(() => {
       if (this.overlay.parentNode) {
         this.overlay.parentNode.removeChild(this.overlay);
       }
-
-      // Emit event signaling the onboarding job is fully done
       this.el.emit("start-button-job-done", null, false);
     }, this.data.fade_in_time);
   },
