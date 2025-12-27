@@ -12,7 +12,7 @@
           "three/addons/": "https://cdn.jsdelivr.net/npm/super-three@0.173.4/examples/jsm/",
           "smart-height-adjuster": "./smart-height-adjuster.js",
           "tornado": "./tornado.js",
-          "start-button": "./start-button.js",
+          "marker": "./marker.js",
           "handy-controls": "https://cdn.jsdelivr.net/npm/handy-work/build/handy-controls.min.js",
           "sphere-collider": "https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.5.4/dist/components/sphere-collider.min.js",
           "aframe-extras-controls": "https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.5.4/dist/aframe-extras.controls.min.js",
@@ -27,23 +27,25 @@
       import "handy-controls"; 
       import 'smart-height-adjuster';
       import 'tornado'; 
-      import 'start-button'; // Import the new component
+      import 'marker'; // Import the marker component
     </script>
   </head>
   <body>
     <!-- 
-       Attached start-button to the scene. 
-       background matches Three.js black.
-       fog matches Three.js settings.
+       Scene setup matching Three.js: Black background, Black Exponential Fog
     -->
-    <a-scene 
-        start-button="fade_in_time: 2000"
-        background="color: #000000" 
-        fog="type: exponential; density: 0.02; color: #000000" 
-        xr-mode-ui>
+    <a-scene background="color: #000000" fog="type: exponential; density: 0.02; color: #000000" xr-mode-ui>
       
-      <!-- The Living Plasma Vortex -->
-      <a-entity tornado position="0 0 -7"></a-entity>
+      <!-- 
+           The Tornado Entity 
+           - tornado: Generates the mesh
+           - marker: Calculates distances relative to camera #head
+      -->
+      <a-entity 
+          tornado 
+          marker="camera: #head" 
+          position="0 0 -7">
+      </a-entity>
 
       <!-- Camera Rig -->
       <a-entity id="cameraRig" position="0 0 0" movement-controls="enabled: true; speed: 0.2; camera:#head;"
