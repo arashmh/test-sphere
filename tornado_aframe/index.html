@@ -1,0 +1,57 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>The Living Plasma Vortex • A-Frame</title>
+    <meta name="description" content="The Living Plasma Vortex • A-Frame" />
+    <script type="importmap">
+      {
+        "imports": {
+          "aframe": "https://aframe.io/releases/1.7.0/aframe.module.min.js",
+          "three": "https://cdn.jsdelivr.net/npm/super-three@0.173.4/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/super-three@0.173.4/examples/jsm/",
+          "smart-height-adjuster": "./smart-height-adjuster.js",
+          "tornado": "./tornado.js",
+          "handy-controls": "https://cdn.jsdelivr.net/npm/handy-work/build/handy-controls.min.js",
+          "sphere-collider": "https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.5.4/dist/components/sphere-collider.min.js",
+          "aframe-extras-controls": "https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.5.4/dist/aframe-extras.controls.min.js",
+          "lil-gui": "https://unpkg.com/lil-gui@0.19.1/dist/lil-gui.esm.min.js"
+        }
+      }
+    </script>
+    <script type="module">
+      import AFRAME from 'aframe';
+      import "sphere-collider";
+      import "aframe-extras-controls";
+      import "handy-controls"; 
+      import 'smart-height-adjuster';
+      import 'tornado'; // The component that makes the magic happen
+    </script>
+  </head>
+  <body>
+    <!-- 
+       Updated Scene to match Three.js environment:
+       1. background="color: #000000" (Black)
+       2. fog="type: exponential; density: 0.02; color: #000000"
+    -->
+    <a-scene background="color: #000000" fog="type: exponential; density: 0.02; color: #000000" xr-mode-ui>
+      
+      <!-- The Living Plasma Vortex (This component includes the Tornado and the Pool floor) -->
+      <a-entity tornado position="0 0 -7"></a-entity>
+
+      <!-- Camera Rig (Kept for VR/navigation compatibility) -->
+      <a-entity id="cameraRig" position="0 0 0" movement-controls="enabled: true; speed: 0.2; camera:#head;"
+              smart-height-adjuster="
+                 targetHeight: 1.8; 
+                 threshold: 1.55; 
+                 interval: 5000;
+                 sitting_to_standing_threshold_for_readjustment: 0.4">
+      
+           <a-entity id="camera-height-adjuster" position="0 0 0">
+              <a-entity id="head" camera="active: true" look-controls position="0 1.75 0"></a-entity>
+              <a-entity id="hands" handy-controls="renderGamepad: any; materialOverride: both;" material="color: #FFDB58; metalness: 0.5; roughness: 0.3;"></a-entity>
+           </a-entity>
+      </a-entity>
+    </a-scene>
+  </body>
+</html>
