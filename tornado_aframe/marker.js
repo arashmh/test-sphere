@@ -4,49 +4,55 @@ import * as THREE from "three";
 AFRAME.registerComponent("marker", {
   schema: {
     camera: { type: "selector", default: "#head" },
+    show_hud: { type: "boolean", default: false }, // Default false as requested
   },
 
   init: function () {
+    // --- TIMING ---
+    this.tickTimer = 0;
+    this.interval = 150; // Run every 150ms
+
     // --- HUD SETUP ---
-    this.cameraEl = this.data.camera;
+    // Only create HUD if requested
+    if (this.data.show_hud) {
+      this.cameraEl = this.data.camera;
 
-    // Create the text entity
-    this.hud = document.createElement("a-text");
+      this.hud = document.createElement("a-text");
+      // Position: Top Left
+      this.hud.setAttribute("position", "-0.7 0.7 -1");
+      this.hud.setAttribute("width", 1.5);
+      this.hud.setAttribute("color", "#ffffff");
+      this.hud.setAttribute("align", "left");
+      this.hud.setAttribute("anchor", "left");
+      this.hud.setAttribute("font", "sourcecodepro");
+      this.hud.setAttribute("value", "Initializing...");
+      this.hud.setAttribute("material", "depthTest: false; shader: flat;");
+      this.hud.setAttribute("render-order", "999");
 
-    // Position: X=-0.7 (Left), Y=0.7 (Up), Z=-1 (1 meter forward)
-    this.hud.setAttribute("position", "-0.7 0.7 -1");
+      this.cameraEl.appendChild(this.hud);
+    } else {
+      // Need reference to camera even if no HUD, for calculations
+      this.cameraEl = this.data.camera;
+    }
 
-    this.hud.setAttribute("width", 1.5); // Slightly smaller scale for cleaner look
-    this.hud.setAttribute("color", "#ffffff");
-
-    // Align left/Anchor left ensures text grows to the right (into the view)
-    this.hud.setAttribute("align", "left");
-    this.hud.setAttribute("anchor", "left");
-
-    this.hud.setAttribute("font", "sourcecodepro");
-    this.hud.setAttribute("value", "Initializing...");
-
-    // Ensure it doesn't get occluded by the tornado or fog
-    this.hud.setAttribute("material", "depthTest: false; shader: flat;");
-    this.hud.setAttribute("render-order", "999");
-
-    this.cameraEl.appendChild(this.hud);
-
-    // Reusable objects to prevent GC
+    // Reusable objects
     this.tornadoPos = new THREE.Vector3();
     this.camPos = new THREE.Vector3();
     this.curve = new THREE.SplineCurve();
   },
 
-  tick: function () {
-    // 1. Get Tornado Component Reference
-    const tornadoComp = this.el.components.tornado;
+  tick: function (t, dt) {
+    // --- THROTTLE (150ms) ---
+    this.tickTimer += dt;
+    if (this.tickTimer < this.interval) return;
+    this.tickTimer = 0;
 
-    // Safety check: wait for tornado to initialize
+    // 1. Get Tornado Data
+    const tornadoComp = this.el.components.tornado;
     if (!tornadoComp || !tornadoComp.params) return;
     const p = tornadoComp.params;
 
-    // 2. Rebuild the spline curve based on current params (Live GUI support)
+    // 2. Rebuild curve (Live GUI support)
     const points = [
       new THREE.Vector2(p.baseWidth, 0),
       new THREE.Vector2(p.baseWidth * 0.5, 0.5),
@@ -58,33 +64,26 @@ AFRAME.registerComponent("marker", {
     ];
     this.curve.points = points;
 
-    // 3. Calculate Positions (World Space)
+    // 3. World Positions
     this.el.object3D.getWorldPosition(this.tornadoPos);
     this.cameraEl.object3D.getWorldPosition(this.camPos);
 
-    // 4. Calculate Cylindrical Coordinates
-    // Vertical distance (Y) from tornado base
+    // 4. Cylindrical Calculations
     const localY = this.camPos.y - this.tornadoPos.y;
-
-    // Horizontal distance (Radius) from center line
     const dx = this.camPos.x - this.tornadoPos.x;
     const dz = this.camPos.z - this.tornadoPos.z;
     const distFromCenter = Math.sqrt(dx * dx + dz * dz);
 
-    // 5. Calculate Radius of Core and Shell at this specific height
+    // 5. Get Radii at Height
     const curvePoints = this.curve.getPoints(100);
-    let radiusCore = 0;
-    let radiusShell = 0;
 
-    // Helper to find X (radius) given Y in the points array
     const getRadiusAtY = (targetY) => {
-      if (targetY < 0) return points[0].x; // Below base, use base width
-      if (targetY > p.totalHeight) return 0; // Above top
+      if (targetY < 0) return points[0].x;
+      if (targetY > p.totalHeight) return 0;
 
       for (let i = 0; i < curvePoints.length - 1; i++) {
         const p1 = curvePoints[i];
         const p2 = curvePoints[i + 1];
-
         if (targetY >= p1.y && targetY <= p2.y) {
           const alpha = (targetY - p1.y) / (p2.y - p1.y);
           return p1.x + (p2.x - p1.x) * alpha;
@@ -93,26 +92,49 @@ AFRAME.registerComponent("marker", {
       return 0;
     };
 
-    // Get Core Radius
-    radiusCore = getRadiusAtY(localY);
+    const radiusCore = getRadiusAtY(localY);
+    const radiusShell = getRadiusAtY(localY / 1.02) * 1.05;
 
-    // Get Shell Radius (Shell is scaled: Y/1.02 -> result * 1.05)
-    const shellHeightUnscaled = localY / 1.02;
-    const rawShellRadius = getRadiusAtY(shellHeightUnscaled);
-    radiusShell = rawShellRadius * 1.05;
+    // 6. Calculate Intersection Points (Global Coordinates)
 
-    // 6. Calculate Distances (in CM)
-    const distToCoreCm = (distFromCenter - radiusCore) * 100;
-    const distToShellCm = (distFromCenter - radiusShell) * 100;
-    const distFromCenterCm = distFromCenter * 100;
+    // Normalize direction vector from Tornado Center to Camera
+    let dirX = 0,
+      dirZ = 0;
+    if (distFromCenter > 0.001) {
+      dirX = dx / distFromCenter;
+      dirZ = dz / distFromCenter;
+    }
 
-    // 7. Update HUD
-    const text =
-      `Dist Center:   ${distFromCenterCm.toFixed(1)} cm\n` +
-      `Dist Shell:    ${distToShellCm.toFixed(1)} cm\n` +
-      `Dist Plasma:   ${distToCoreCm.toFixed(1)} cm`;
+    // Calculate intersection coordinates
+    // Base Pos + (Direction * Radius) + Vertical Height
 
-    this.hud.setAttribute("value", text);
+    const shellIntX = this.tornadoPos.x + dirX * radiusShell;
+    const shellIntZ = this.tornadoPos.z + dirZ * radiusShell;
+    const shellIntY = this.camPos.y; // Intersection is at camera height
+
+    const plasmaIntX = this.tornadoPos.x + dirX * radiusCore;
+    const plasmaIntZ = this.tornadoPos.z + dirZ * radiusCore;
+    const plasmaIntY = this.camPos.y;
+
+    // 7. Emit Event
+    this.el.emit("position-updated", {
+      shell: { x: shellIntX, y: shellIntY, z: shellIntZ },
+      plasma: { x: plasmaIntX, y: plasmaIntY, z: plasmaIntZ },
+    });
+
+    // 8. Update HUD (Only if enabled)
+    if (this.data.show_hud && this.hud) {
+      const distToCoreCm = (distFromCenter - radiusCore) * 100;
+      const distToShellCm = (distFromCenter - radiusShell) * 100;
+      const distFromCenterCm = distFromCenter * 100;
+
+      const text =
+        `Dist Center:   ${distFromCenterCm.toFixed(1)} cm\n` +
+        `Dist Shell:    ${distToShellCm.toFixed(1)} cm\n` +
+        `Dist Plasma:   ${distToCoreCm.toFixed(1)} cm`;
+
+      this.hud.setAttribute("value", text);
+    }
   },
 
   remove: function () {

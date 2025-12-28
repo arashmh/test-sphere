@@ -34,7 +34,7 @@
     <!-- 
        Scene setup matching Three.js: Black background, Black Exponential Fog
     -->
-    <a-scene background="color: #000000" fog="type: exponential; density: 0.02; color: #000000" xr-mode-ui>
+    <a-scene  background="color: #000000" fog="type: exponential; density: 0.02; color: #000000" xr-mode-ui>
       
       <!-- 
            The Tornado Entity 
@@ -43,7 +43,7 @@
       -->
       <a-entity 
           tornado 
-          marker="camera: #head" 
+          marker="camera: #head; show_hud: false;" 
           position="0 0 -7">
       </a-entity>
 
