@@ -14,6 +14,7 @@
           "tornado": "./tornado.js",
           "start-button": "./start-button.js",
         "marker": "./marker.js",
+        "intersection-marker": "./intersection-marker.js",
 
           "handy-controls": "https://cdn.jsdelivr.net/npm/handy-work/build/handy-controls.min.js",
           "sphere-collider": "https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.5.4/dist/components/sphere-collider.min.js",
@@ -31,6 +32,8 @@
       import 'tornado'; 
       import 'start-button'; // Import the new component
          import 'marker'; // Import the marker component
+          import 'intersection-marker'; // Import the new component
+
 
     </script>
   </head>
@@ -47,9 +50,14 @@
         xr-mode-ui>
       
       <!-- The Living Plasma Vortex -->
-      <a-entity tornado
+      <a-entity id="tornado" tornado
                 marker="camera: #head; show_hud: true;" 
                  position="0 0 -7"></a-entity>
+
+    <!-- entity at intersection -->
+    <a-entity id="intersection-marker" intersection-marker="position_event_entity:#tornado">
+          <a-sphere radius="0.2" color="green"></a-sphere>
+      </a-entity>
 
       <!-- Camera Rig -->
       <a-entity id="cameraRig" position="0 0 0" movement-controls="enabled: true; speed: 0.2; camera:#head;"
