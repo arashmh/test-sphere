@@ -155,6 +155,7 @@ AFRAME.registerComponent("start-button", {
         this.overlay.parentNode.removeChild(this.overlay);
       }
       this.el.emit("start-button-job-done", null, false);
+      console.log("Start Button: Job Done emitted.");
     }, this.data.fade_in_time);
   },
 });

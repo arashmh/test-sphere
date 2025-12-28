@@ -15,6 +15,7 @@
           "start-button": "./start-button.js",
         "marker": "./marker.js",
         "intersection-marker": "./intersection-marker.js",
+        "play-on-start": "./play-on-start.js",
 
           "handy-controls": "https://cdn.jsdelivr.net/npm/handy-work/build/handy-controls.min.js",
           "sphere-collider": "https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.5.4/dist/components/sphere-collider.min.js",
@@ -33,6 +34,8 @@
       import 'start-button'; // Import the new component
          import 'marker'; // Import the marker component
           import 'intersection-marker'; // Import the new component
+            import 'play-on-start'; 
+
 
 
     </script>
@@ -48,16 +51,58 @@
         background="color: #000000" 
         fog="type: exponential; density: 0.02; color: #000000" 
         xr-mode-ui>
+
+    <!-- assets -->
+        <a-assets>
+            <audio id="shell" src="./assets/sounds/shell.mp3"></audio>
+            <audio id="background" src="./assets/sounds/background.mp3"></audio>
+            <audio id="underwater" src="./assets/sounds/underwater.mp3"></audio>
+        </a-assets>
       
       <!-- The Living Plasma Vortex -->
       <a-entity id="tornado" tornado
                 marker="camera: #head; show_hud: true;" 
-                 position="0 0 -7"></a-entity>
+                 position="0 0 -7">
 
-    <!-- entity at intersection -->
+                 <!-- sound for tornado-->
+        <a-entity
+                position="0 15 0"
+                sound="src: #background; 
+                 autoplay: false; 
+                 loop: true; 
+                 volume: 1;
+                 distanceModel: exponential;"
+        play-on-start
+></a-entity>
+
+        <!-- underwater ambient sound  -->
+        <a-entity
+                position="0 1.8 0"
+                sound="src: #underwater; 
+                 autoplay: false; 
+                 loop: true; 
+                 volume: 0.3;
+                 distanceModel: exponential;
+                 refDistance: 0.1;
+                 rolloffFactor: 2;"
+        play-on-start
+></a-entity>
+
+        </a-entity>
+
+    <!-- entity at intersection with child sound -->
     <a-entity id="intersection-marker" intersection-marker="position_event_entity:#tornado">
-          <a-sphere radius="0.2" color="green"></a-sphere>
-      </a-entity>
+        <a-entity 
+      sound="src: #shell; 
+                 autoplay: false; 
+                 loop: true; 
+                 volume: 1;
+                 distanceModel: exponential;
+                 refDistance: 0.1;
+                 rolloffFactor: 2;"
+        play-on-start
+></a-entity>
+    </a-entity>
 
       <!-- Camera Rig -->
       <a-entity id="cameraRig" position="0 0 0" movement-controls="enabled: true; speed: 0.2; camera:#head;"
