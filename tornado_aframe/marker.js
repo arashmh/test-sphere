@@ -120,6 +120,7 @@ AFRAME.registerComponent("marker", {
     this.el.emit("position-updated", {
       shell: { x: shellIntX, y: shellIntY, z: shellIntZ },
       plasma: { x: plasmaIntX, y: plasmaIntY, z: plasmaIntZ },
+      distance: distFromCenter,
     });
 
     // 8. Update HUD (Only if enabled)
