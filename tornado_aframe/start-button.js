@@ -11,14 +11,49 @@ AFRAME.registerComponent("start-button", {
     this.createOverlay();
 
     // Bind methods
-    this.onSceneLoaded = this.onSceneLoaded.bind(this);
+    this.checkLoadState = this.checkLoadState.bind(this);
+    this.onAllLoaded = this.onAllLoaded.bind(this);
     this.onStartClick = this.onStartClick.bind(this);
 
-    // Listen for scene load
-    if (this.el.hasLoaded) {
-      this.onSceneLoaded();
+    // 1. Get references
+    const scene = this.el;
+    const assets = document.querySelector("a-assets");
+
+    // 2. Define the listener logic
+    // We attach this to both Scene and Assets to ensure we catch the latest one
+    if (scene.hasLoaded) {
+      this.checkLoadState();
     } else {
-      this.el.addEventListener("loaded", this.onSceneLoaded);
+      scene.addEventListener("loaded", this.checkLoadState);
+    }
+
+    if (assets) {
+      if (assets.hasLoaded) {
+        this.checkLoadState();
+      } else {
+        // Specifically listen for the assets loaded event
+        assets.addEventListener("loaded", this.checkLoadState);
+      }
+    } else {
+      // If no a-assets tag exists, just rely on scene load
+      this.checkLoadState();
+    }
+  },
+
+  checkLoadState: function () {
+    const scene = this.el;
+    const assets = document.querySelector("a-assets");
+
+    const sceneLoaded = scene.hasLoaded;
+    // If <a-assets> exists, check if it's loaded. If it doesn't exist, treat as true.
+    const assetsLoaded = assets ? assets.hasLoaded : true;
+
+    if (sceneLoaded && assetsLoaded) {
+      // Remove listeners so this doesn't fire multiple times
+      scene.removeEventListener("loaded", this.checkLoadState);
+      if (assets) assets.removeEventListener("loaded", this.checkLoadState);
+
+      this.onAllLoaded();
     }
   },
 
@@ -121,13 +156,14 @@ AFRAME.registerComponent("start-button", {
     this.text = document.createElement("div");
     this.text.id = "ethereal-text";
     this.text.className = "ethereal-loading";
-    this.text.innerText = "INITIALIZING ETHER...";
+    this.text.innerText = "INITIALIZING ETHER..."; // Initial Text
 
     this.overlay.appendChild(this.text);
     document.body.appendChild(this.overlay);
   },
 
-  onSceneLoaded: function () {
+  onAllLoaded: function () {
+    // Small timeout to ensure browser renders the final frames of loading
     setTimeout(() => {
       this.text.innerText = "ENTER IBI";
       this.text.classList.remove("ethereal-loading");
@@ -140,7 +176,9 @@ AFRAME.registerComponent("start-button", {
     // 1. Enter VR
     if (this.data.enter_vr) {
       try {
-        this.el.enterVR();
+        if (AFRAME.utils.device.checkHeadsetConnected()) {
+          this.el.enterVR();
+        }
       } catch (e) {
         console.warn("Could not enter VR automatically", e);
       }
