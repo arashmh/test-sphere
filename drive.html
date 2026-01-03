@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Drive Direct Link</title>
+    <title>Drive Link Pro</title>
     <style>
         :root {
             --bg-color: #fafafa;
@@ -18,12 +18,7 @@
             --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
 
         body {
             background-color: var(--bg-color);
@@ -37,216 +32,117 @@
 
         .container {
             background: var(--card-bg);
-            padding: 3rem;
+            padding: 2.5rem;
             border-radius: 24px;
             box-shadow: var(--shadow);
             width: 100%;
-            max-width: 540px;
+            max-width: 500px;
             border: 1px solid var(--border);
             text-align: center;
         }
 
-        h1 {
-            font-size: 1.75rem;
-            font-weight: 700;
-            letter-spacing: -0.025em;
-            margin-bottom: 0.5rem;
-        }
+        h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.5rem; }
+        p.subtitle { color: var(--text-sub); font-size: 0.9rem; margin-bottom: 2rem; }
 
-        p.subtitle {
-            color: var(--text-sub);
-            font-size: 0.95rem;
-            margin-bottom: 2.5rem;
-            line-height: 1.5;
-        }
-
-        .input-group {
-            position: relative;
-            margin-bottom: 1.5rem;
-            text-align: left;
-        }
-
-        label {
-            display: block;
-            font-size: 0.8rem;
-            font-weight: 600;
-            color: var(--text-sub);
-            margin-bottom: 0.5rem;
-            margin-left: 4px;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
+        .input-group { text-align: left; margin-bottom: 1rem; }
+        label { display: block; font-size: 0.75rem; font-weight: 700; color: var(--text-sub); margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.05em; }
 
         input {
-            width: 100%;
-            padding: 16px 20px;
-            font-size: 1rem;
-            border: 2px solid var(--border);
-            border-radius: 12px;
-            background: var(--bg-color);
-            color: var(--text-main);
-            transition: var(--transition);
-            outline: none;
+            width: 100%; padding: 14px; font-size: 1rem;
+            border: 2px solid var(--border); border-radius: 12px;
+            background: var(--bg-color); transition: var(--transition); outline: none;
         }
+        input:focus { border-color: var(--accent); background: #fff; }
 
-        input:focus {
-            border-color: var(--accent);
-            background: #fff;
-        }
-
-        input::placeholder {
-            color: #d4d4d4;
-        }
-
-        .actions {
-            display: flex;
-            gap: 12px;
-            margin-top: 2rem;
-        }
-
+        .actions { display: flex; gap: 10px; margin-top: 1.5rem; }
+        
         button {
-            border: none;
-            padding: 16px 24px;
-            font-size: 1rem;
-            font-weight: 600;
-            border-radius: 12px;
-            cursor: pointer;
-            transition: var(--transition);
+            border: none; padding: 14px; font-size: 0.95rem; font-weight: 600;
+            border-radius: 12px; cursor: pointer; transition: var(--transition);
         }
 
-        .btn-primary {
-            background-color: var(--accent);
-            color: white;
-            flex: 2;
-            box-shadow: 0 4px 6px rgba(37, 99, 235, 0.2);
-        }
+        .btn-primary { background-color: var(--accent); color: white; flex: 2; }
+        .btn-primary:hover { background-color: var(--accent-hover); }
+        .btn-secondary { background-color: transparent; border: 2px solid var(--border); color: var(--text-main); flex: 1; }
+        .btn-secondary:hover { background-color: var(--bg-color); border-color: #d4d4d4; }
 
-        .btn-primary:hover {
-            background-color: var(--accent-hover);
-            transform: translateY(-1px);
-        }
-
-        .btn-secondary {
-            background-color: transparent;
-            border: 2px solid var(--border);
-            color: var(--text-main);
-            flex: 1;
-        }
-
-        .btn-secondary:hover {
-            background-color: var(--bg-color);
-            border-color: #d1d1d1;
-        }
-
-        /* Result Area */
+        /* Results */
         .result-container {
-            margin-top: 2rem;
-            opacity: 0;
-            transform: translateY(10px);
-            transition: var(--transition);
-            pointer-events: none; /* disabled until active */
+            margin-top: 2rem; opacity: 0; transform: translateY(10px);
+            transition: var(--transition); pointer-events: none;
+            display: none; /* Hidden by default */
         }
-
-        .result-container.active {
-            opacity: 1;
-            transform: translateY(0);
-            pointer-events: all;
-        }
+        .result-container.active { opacity: 1; transform: translateY(0); pointer-events: all; display: block; }
 
         .result-box {
-            display: flex;
-            align-items: center;
-            background: #f0fdf4;
-            border: 1px solid #bbf7d0;
-            border-radius: 12px;
-            padding: 12px;
-            position: relative;
+            display: flex; align-items: center; background: #f0fdf4;
+            border: 1px solid #bbf7d0; border-radius: 12px; padding: 10px;
         }
-
         .result-link {
-            flex-grow: 1;
-            font-family: monospace;
-            font-size: 0.9rem;
-            color: var(--success);
-            background: transparent;
-            border: none;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            margin-right: 10px;
+            flex-grow: 1; font-family: monospace; font-size: 0.9rem; color: var(--success);
+            background: transparent; border: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: 10px;
         }
-        
-        .result-link:focus {
-            outline: none;
-        }
-
         .copy-btn {
-            background: white;
-            border: 1px solid #bbf7d0;
-            color: var(--success);
-            padding: 8px 16px;
-            font-size: 0.85rem;
-            border-radius: 8px;
-            flex: 0 0 auto;
+            background: white; border: 1px solid #bbf7d0; color: var(--success);
+            padding: 8px 14px; font-size: 0.8rem; border-radius: 8px;
         }
+        .copy-btn:hover { background: #dcfce7; }
 
-        .copy-btn:hover {
-            background: #dcfce7;
-            transform: none;
+        /* Metadata Badge area */
+        .meta-data {
+            display: flex; gap: 10px; margin-top: 10px; justify-content: center;
         }
+        .badge {
+            font-size: 0.75rem; padding: 4px 12px; border-radius: 20px;
+            background: #f3f4f6; color: #6b7280; font-weight: 600;
+            display: flex; align-items: center; gap: 6px;
+        }
+        .badge span { color: var(--text-main); }
+        .badge.loading { opacity: 0.5; }
 
-        .copy-btn.copied {
-            background: var(--success);
-            color: white;
-        }
+        .error-msg { color: #ef4444; font-size: 0.85rem; margin-top: 8px; opacity: 0; transition: opacity 0.2s; height: 20px; }
 
-        .error-msg {
-            color: #ef4444;
-            font-size: 0.85rem;
-            margin-top: 8px;
-            min-height: 20px;
-            text-align: left;
-            margin-left: 4px;
-            opacity: 0;
-            transition: opacity 0.2s;
+        /* Loader */
+        .spinner {
+            width: 12px; height: 12px; border: 2px solid #ccc; 
+            border-top-color: var(--text-sub); border-radius: 50%;
+            animation: spin 1s linear infinite; display: none;
         }
-
-        /* Footer */
-        .footer {
-            margin-top: 3rem;
-            font-size: 0.75rem;
-            color: #a3a3a3;
-        }
+        @keyframes spin { to { transform: rotate(360deg); } }
 
     </style>
 </head>
 <body>
 
     <div class="container">
-        <h1>Drive Direct Link</h1>
-        <p class="subtitle">Convert Google Drive share URLs into instant direct download links.</p>
+        <h1>Drive Link Pro</h1>
+        <p class="subtitle">Generate direct links and inspect file details.</p>
 
         <div class="input-group">
-            <label for="urlInput">Paste Share Link</label>
+            <label>Paste Share Link</label>
             <input type="text" id="urlInput" placeholder="https://drive.google.com/file/d/..." autocomplete="off">
-            <div class="error-msg" id="errorMsg">Invalid Google Drive URL</div>
+            <div class="error-msg" id="errorMsg">Invalid URL</div>
         </div>
 
         <div class="actions">
             <button class="btn-secondary" onclick="clearInput()">Clear</button>
-            <button class="btn-primary" onclick="generateLink()">Generate Link</button>
+            <button class="btn-primary" id="genBtn" onclick="processLink()">
+                Generate & Get Info
+            </button>
         </div>
 
         <div class="result-container" id="resultContainer">
-            <label>Direct Download URL</label>
+            <label style="text-align:left">Direct Download URL</label>
             <div class="result-box">
                 <input type="text" class="result-link" id="resultOutput" readonly>
                 <button class="copy-btn" id="copyBtn" onclick="copyToClipboard()">Copy</button>
             </div>
-        </div>
-        
-        <div class="footer">
-            Ensure file access is set to "Anyone with the link"
+            
+            <!-- File Info Area -->
+            <div class="meta-data" id="metaData">
+                <div class="badge" id="sizeBadge">Size: <span id="sizeVal">-</span> <div class="spinner" id="sizeSpin"></div></div>
+                <div class="badge" id="typeBadge">Type: <span id="typeVal">-</span></div>
+            </div>
         </div>
     </div>
 
@@ -256,21 +152,97 @@
         const resultContainer = document.getElementById('resultContainer');
         const errorMsg = document.getElementById('errorMsg');
         const copyBtn = document.getElementById('copyBtn');
+        const sizeVal = document.getElementById('sizeVal');
+        const typeVal = document.getElementById('typeVal');
+        const sizeSpin = document.getElementById('sizeSpin');
 
-        // Allow pressing Enter to submit
-        urlInput.addEventListener('keypress', function (e) {
-            if (e.key === 'Enter') {
-                generateLink();
-            }
-        });
-
-        // Reset UI when user types
-        urlInput.addEventListener('input', function() {
-            errorMsg.style.opacity = '0';
-            if(this.value === "") {
+        async function processLink() {
+            const inputUrl = urlInput.value.trim();
+            const regex = /\/d\/([a-zA-Z0-9_-]+)|\?id=([a-zA-Z0-9_-]+)/;
+            const match = inputUrl.match(regex);
+            
+            if (match && (match[1] || match[2])) {
+                const fileId = match[1] || match[2];
+                const directLink = `https://drive.google.com/uc?export=download&id=${fileId}`;
+                
+                // Show Basic Result immediately
+                resultOutput.value = directLink;
+                resultContainer.classList.add('active');
+                errorMsg.style.opacity = '0';
+                
+                // Fetch Metadata
+                fetchMetadata(directLink);
+            } else {
                 resultContainer.classList.remove('active');
+                errorMsg.innerText = "Invalid Google Drive URL";
+                errorMsg.style.opacity = '1';
             }
-        });
+        }
+
+        async function fetchMetadata(link) {
+            // Reset UI
+            sizeVal.innerText = "";
+            typeVal.innerText = "";
+            sizeSpin.style.display = "block";
+            
+            // WE MUST USE A CORS PROXY
+            // Direct requests to drive.google.com from JS are blocked by CORS policy.
+            // Using a public proxy for demonstration:
+            const corsProxy = "https://corsproxy.io/?"; 
+            
+            try {
+                // Method: HEAD gets headers ONLY (does not download body)
+                const response = await fetch(corsProxy + encodeURIComponent(link), { 
+                    method: 'HEAD' 
+                });
+
+                if(!response.ok) throw new Error("Network error");
+
+                // Get Headers
+                const length = response.headers.get("content-length");
+                const type = response.headers.get("content-type");
+
+                // Check if Google returned the "Virus Scan Warning" HTML page instead of the file
+                // This happens for files > 100MB usually.
+                const isHtmlWarning = type && type.includes("text/html");
+
+                if (isHtmlWarning) {
+                    sizeVal.innerText = "Large File (>100MB)";
+                    typeVal.innerText = "Unknown";
+                } else {
+                    sizeVal.innerText = formatBytes(length);
+                    typeVal.innerText = formatMimeType(type);
+                }
+
+            } catch (error) {
+                console.error(error);
+                sizeVal.innerText = "Error";
+                typeVal.innerText = "Unknown";
+            } finally {
+                sizeSpin.style.display = "none";
+            }
+        }
+
+        function formatBytes(bytes, decimals = 1) {
+            if (!bytes) return 'Unknown';
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const dm = decimals < 0 ? 0 : decimals;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+        }
+
+        function formatMimeType(mime) {
+            if(!mime) return "File";
+            // Clean up mime type for display
+            if(mime.includes("image")) return "Image";
+            if(mime.includes("pdf")) return "PDF";
+            if(mime.includes("zip") || mime.includes("rar")) return "Archive";
+            if(mime.includes("video")) return "Video";
+            if(mime.includes("audio")) return "Audio";
+            return mime.split('/')[1].toUpperCase();
+        }
 
         function clearInput() {
             urlInput.value = '';
@@ -279,48 +251,12 @@
             urlInput.focus();
         }
 
-        function generateLink() {
-            const inputUrl = urlInput.value.trim();
-            
-            // 1. Extract File ID using Regex
-            // Matches /d/FILE_ID or id=FILE_ID
-            const regex = /\/d\/([a-zA-Z0-9_-]+)|\?id=([a-zA-Z0-9_-]+)/;
-            const match = inputUrl.match(regex);
-            
-            if (match && (match[1] || match[2])) {
-                const fileId = match[1] || match[2];
-                
-                // 2. Construct Direct Link
-                const directLink = `https://drive.google.com/uc?export=download&id=${fileId}`;
-                
-                // 3. Update UI
-                resultOutput.value = directLink;
-                resultContainer.classList.add('active');
-                errorMsg.style.opacity = '0';
-                
-                // Reset copy button state
-                copyBtn.textContent = "Copy";
-                copyBtn.classList.remove('copied');
-            } else {
-                // Show Error
-                resultContainer.classList.remove('active');
-                errorMsg.style.opacity = '1';
-            }
-        }
-
         function copyToClipboard() {
             resultOutput.select();
-            resultOutput.setSelectionRange(0, 99999); // For mobile devices
-
+            resultOutput.setSelectionRange(0, 99999);
             navigator.clipboard.writeText(resultOutput.value).then(() => {
                 copyBtn.textContent = "Copied!";
-                copyBtn.classList.add('copied');
-                
-                // Reset text after 2 seconds
-                setTimeout(() => {
-                    copyBtn.textContent = "Copy";
-                    copyBtn.classList.remove('copied');
-                }, 2000);
+                setTimeout(() => copyBtn.textContent = "Copy", 2000);
             });
         }
     </script>
