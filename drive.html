@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Drive Direct Link</title>
+    <style>
+        :root {
+            --bg-color: #fafafa;
+            --card-bg: #ffffff;
+            --text-main: #1a1a1a;
+            --text-sub: #757575;
+            --accent: #2563eb;
+            --accent-hover: #1d4ed8;
+            --border: #e5e5e5;
+            --success: #10b981;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+            --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            background: var(--card-bg);
+            padding: 3rem;
+            border-radius: 24px;
+            box-shadow: var(--shadow);
+            width: 100%;
+            max-width: 540px;
+            border: 1px solid var(--border);
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 1.75rem;
+            font-weight: 700;
+            letter-spacing: -0.025em;
+            margin-bottom: 0.5rem;
+        }
+
+        p.subtitle {
+            color: var(--text-sub);
+            font-size: 0.95rem;
+            margin-bottom: 2.5rem;
+            line-height: 1.5;
+        }
+
+        .input-group {
+            position: relative;
+            margin-bottom: 1.5rem;
+            text-align: left;
+        }
+
+        label {
+            display: block;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-sub);
+            margin-bottom: 0.5rem;
+            margin-left: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        input {
+            width: 100%;
+            padding: 16px 20px;
+            font-size: 1rem;
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            background: var(--bg-color);
+            color: var(--text-main);
+            transition: var(--transition);
+            outline: none;
+        }
+
+        input:focus {
+            border-color: var(--accent);
+            background: #fff;
+        }
+
+        input::placeholder {
+            color: #d4d4d4;
+        }
+
+        .actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 2rem;
+        }
+
+        button {
+            border: none;
+            padding: 16px 24px;
+            font-size: 1rem;
+            font-weight: 600;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .btn-primary {
+            background-color: var(--accent);
+            color: white;
+            flex: 2;
+            box-shadow: 0 4px 6px rgba(37, 99, 235, 0.2);
+        }
+
+        .btn-primary:hover {
+            background-color: var(--accent-hover);
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background-color: transparent;
+            border: 2px solid var(--border);
+            color: var(--text-main);
+            flex: 1;
+        }
+
+        .btn-secondary:hover {
+            background-color: var(--bg-color);
+            border-color: #d1d1d1;
+        }
+
+        /* Result Area */
+        .result-container {
+            margin-top: 2rem;
+            opacity: 0;
+            transform: translateY(10px);
+            transition: var(--transition);
+            pointer-events: none; /* disabled until active */
+        }
+
+        .result-container.active {
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: all;
+        }
+
+        .result-box {
+            display: flex;
+            align-items: center;
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            border-radius: 12px;
+            padding: 12px;
+            position: relative;
+        }
+
+        .result-link {
+            flex-grow: 1;
+            font-family: monospace;
+            font-size: 0.9rem;
+            color: var(--success);
+            background: transparent;
+            border: none;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            margin-right: 10px;
+        }
+        
+        .result-link:focus {
+            outline: none;
+        }
+
+        .copy-btn {
+            background: white;
+            border: 1px solid #bbf7d0;
+            color: var(--success);
+            padding: 8px 16px;
+            font-size: 0.85rem;
+            border-radius: 8px;
+            flex: 0 0 auto;
+        }
+
+        .copy-btn:hover {
+            background: #dcfce7;
+            transform: none;
+        }
+
+        .copy-btn.copied {
+            background: var(--success);
+            color: white;
+        }
+
+        .error-msg {
+            color: #ef4444;
+            font-size: 0.85rem;
+            margin-top: 8px;
+            min-height: 20px;
+            text-align: left;
+            margin-left: 4px;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        /* Footer */
+        .footer {
+            margin-top: 3rem;
+            font-size: 0.75rem;
+            color: #a3a3a3;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Drive Direct Link</h1>
+        <p class="subtitle">Convert Google Drive share URLs into instant direct download links.</p>
+
+        <div class="input-group">
+            <label for="urlInput">Paste Share Link</label>
+            <input type="text" id="urlInput" placeholder="https://drive.google.com/file/d/..." autocomplete="off">
+            <div class="error-msg" id="errorMsg">Invalid Google Drive URL</div>
+        </div>
+
+        <div class="actions">
+            <button class="btn-secondary" onclick="clearInput()">Clear</button>
+            <button class="btn-primary" onclick="generateLink()">Generate Link</button>
+        </div>
+
+        <div class="result-container" id="resultContainer">
+            <label>Direct Download URL</label>
+            <div class="result-box">
+                <input type="text" class="result-link" id="resultOutput" readonly>
+                <button class="copy-btn" id="copyBtn" onclick="copyToClipboard()">Copy</button>
+            </div>
+        </div>
+        
+        <div class="footer">
+            Ensure file access is set to "Anyone with the link"
+        </div>
+    </div>
+
+    <script>
+        const urlInput = document.getElementById('urlInput');
+        const resultOutput = document.getElementById('resultOutput');
+        const resultContainer = document.getElementById('resultContainer');
+        const errorMsg = document.getElementById('errorMsg');
+        const copyBtn = document.getElementById('copyBtn');
+
+        // Allow pressing Enter to submit
+        urlInput.addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                generateLink();
+            }
+        });
+
+        // Reset UI when user types
+        urlInput.addEventListener('input', function() {
+            errorMsg.style.opacity = '0';
+            if(this.value === "") {
+                resultContainer.classList.remove('active');
+            }
+        });
+
+        function clearInput() {
+            urlInput.value = '';
+            resultContainer.classList.remove('active');
+            errorMsg.style.opacity = '0';
+            urlInput.focus();
+        }
+
+        function generateLink() {
+            const inputUrl = urlInput.value.trim();
+            
+            // 1. Extract File ID using Regex
+            // Matches /d/FILE_ID or id=FILE_ID
+            const regex = /\/d\/([a-zA-Z0-9_-]+)|\?id=([a-zA-Z0-9_-]+)/;
+            const match = inputUrl.match(regex);
+            
+            if (match && (match[1] || match[2])) {
+                const fileId = match[1] || match[2];
+                
+                // 2. Construct Direct Link
+                const directLink = `https://drive.google.com/uc?export=download&id=${fileId}`;
+                
+                // 3. Update UI
+                resultOutput.value = directLink;
+                resultContainer.classList.add('active');
+                errorMsg.style.opacity = '0';
+                
+                // Reset copy button state
+                copyBtn.textContent = "Copy";
+                copyBtn.classList.remove('copied');
+            } else {
+                // Show Error
+                resultContainer.classList.remove('active');
+                errorMsg.style.opacity = '1';
+            }
+        }
+
+        function copyToClipboard() {
+            resultOutput.select();
+            resultOutput.setSelectionRange(0, 99999); // For mobile devices
+
+            navigator.clipboard.writeText(resultOutput.value).then(() => {
+                copyBtn.textContent = "Copied!";
+                copyBtn.classList.add('copied');
+                
+                // Reset text after 2 seconds
+                setTimeout(() => {
+                    copyBtn.textContent = "Copy";
+                    copyBtn.classList.remove('copied');
+                }, 2000);
+            });
+        }
+    </script>
+</body>
+</html>
